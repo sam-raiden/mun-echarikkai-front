@@ -17,11 +17,11 @@ const uiText = {
     marketAria: 'Open market page',
   },
   TA: {
-    placeholder: 'உங்கள் பயிர் பிரச்சனையை கேளுங்கள்...',
-    tip: 'சரியான ஆலோசனைக்கு பயிர் புகைப்படம் சேர்க்கவும்',
+    placeholder: 'உங்கள் பயிர் பிரச்சினையை கேளுங்கள்...',
+    tip: 'சிறந்த ஆலோசனைக்காக பயிர் புகைப்படம் சேர்க்கவும்',
     imageSelected: 'தேர்ந்தெடுத்த படம்:',
-    uploadAria: 'பயிர் புகைப்படத்தை பதிவேற்று',
-    voiceAria: 'குரலில் கேள்',
+    uploadAria: 'பயிர் படத்தை பதிவேற்று',
+    voiceAria: 'உங்கள் கேள்வியை பேசுங்கள்',
     sendAria: 'கேள்வியை அனுப்பு',
     marketAria: 'சந்தை பக்கத்தை திற',
   },
@@ -37,17 +37,17 @@ export default function Home() {
 
   useEffect(() => {
     const urlLang = searchParams.get('lang');
-    const storedLang =
-      typeof window !== 'undefined' ? localStorage.getItem('appLang') : null;
-    const nextLang =
-      urlLang === 'TA' || urlLang === 'EN'
-        ? (urlLang as 'EN' | 'TA')
-        : storedLang === 'TA' || storedLang === 'EN'
-          ? (storedLang as 'EN' | 'TA')
-          : 'EN';
-    setLanguage(nextLang);
+    if (urlLang === 'TA' || urlLang === 'EN') {
+      setLanguage(urlLang as 'EN' | 'TA');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('appLang', urlLang);
+      }
+      return;
+    }
+
+    setLanguage('EN');
     if (typeof window !== 'undefined') {
-      localStorage.setItem('appLang', nextLang);
+      localStorage.setItem('appLang', 'EN');
     }
   }, [searchParams]);
 

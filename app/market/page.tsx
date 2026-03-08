@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -17,13 +17,13 @@ const uiText = {
       'Do not irrigate Monday. High rainfall expected in your location.',
   },
   TA: {
-    title: 'சந்தை தகவல்கள்',
-    subtitle: 'முன்னணி பயிர் விலை மற்றும் எச்சரிக்கை',
+    title: 'சந்தை நிலவரம்',
+    subtitle: 'முன்னணி பயிர் விலைகள் மற்றும் அறிவிப்புகள்',
     topPrices: 'முக்கிய பயிர் விலைகள்',
-    dayChange: '24 மணி மாற்றம்',
+    dayChange: '24மணி மாற்றம்',
     irrigationTitle: 'நீர்ப்பாசன எச்சரிக்கை',
     irrigationMsg:
-      'திங்கட்கிழமை நீர்ப்பாசனம் செய்ய வேண்டாம். உங்கள் பகுதியில் கனமழை வாய்ப்பு உள்ளது.',
+      'திங்கட்கிழமை நீர்ப்பாசனம் செய்ய வேண்டாம். உங்கள் பகுதியில் அதிக மழை எதிர்பார்க்கப்படுகிறது.',
   },
 } as const;
 
@@ -105,7 +105,7 @@ export default function MarketPage() {
               <div className="flex-1">
                 <p className="font-bold text-foreground">{crop.name}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  ₹{crop.price} {crop.unit}
+                  {'\u20B9'}{crop.price} {crop.unit}
                 </p>
               </div>
               <div className="text-right">

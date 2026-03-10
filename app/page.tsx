@@ -3,11 +3,10 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
-import { ImagePlus, SendHorizontal, TrendingUp } from 'lucide-react'
+import { ImagePlus, Mic, SendHorizontal, TrendingUp } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 import { Spinner } from '@/components/ui/spinner'
-import { VoiceButton } from '@/components/VoiceButton'
 import {
   apiRequest,
   getFriendlyError,
@@ -37,6 +36,7 @@ const uiText = {
     tip: 'Tip: add a crop photo for better advice',
     imageSelected: 'Image selected:',
     uploadAria: 'Upload crop image',
+    voiceAria: 'Record your question',
     sendAria: 'Send question',
     marketAria: 'Open market page',
     listening: 'Listening to your question...',
@@ -46,9 +46,6 @@ const uiText = {
     imageError: 'We could not analyze that image. Please try another one.',
     unsupportedVoice: 'Voice recording is not supported in this browser.',
     retry: 'Retry',
-    startVoice: 'Tap to record',
-    stopVoice: 'Tap again to stop',
-    ready: 'Your question will open in the assistant.',
     languageLabel: 'Language',
   },
   TA: {
@@ -56,6 +53,7 @@ const uiText = {
     tip: 'சிறந்த ஆலோசனைக்கு பயிர் புகைப்படத்தை சேர்க்கவும்',
     imageSelected: 'தேர்ந்தெடுத்த படம்:',
     uploadAria: 'பயிர் படத்தை பதிவேற்று',
+    voiceAria: 'உங்கள் கேள்வியை பதிவு செய்',
     sendAria: 'கேள்வியை அனுப்பு',
     marketAria: 'சந்தை பக்கத்தை திற',
     listening: 'உங்கள் கேள்வியை கேட்டு கொண்டிருக்கிறோம்...',
@@ -65,9 +63,6 @@ const uiText = {
     imageError: 'இந்த படத்தை ஆய்வு செய்ய முடியவில்லை. வேறு படத்தை முயற்சிக்கவும்.',
     unsupportedVoice: 'இந்த உலாவியில் குரல் பதிவு ஆதரிக்கப்படவில்லை.',
     retry: 'மீண்டும் முயற்சி',
-    startVoice: 'பதிவு தொடங்கு',
-    stopVoice: 'நிறுத்த மீண்டும் தட்டவும்',
-    ready: 'உங்கள் கேள்வி உதவி பக்கத்தில் திறக்கும்.',
     languageLabel: 'மொழி',
   },
 } as const
@@ -255,13 +250,15 @@ function HomePage() {
     persistLanguage(nextLanguage)
   }
 
-  const statusMessage = isVoiceLoading
+  const helperText = isVoiceLoading
     ? t.transcribing
     : isImageLoading
       ? t.analyzingImage
       : isListening
         ? t.listening
-        : t.ready
+        : selectedImageName
+          ? `${t.imageSelected} ${selectedImageName}`
+          : t.tip
 
   return (
     <div className="max-w-[420px] mx-auto min-h-screen relative overflow-hidden">
@@ -298,7 +295,7 @@ function HomePage() {
         transition={{ delay: 0.08 }}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[90%]"
       >
-        <div className="bg-white/95 text-black rounded-[28px] shadow-xl p-4 space-y-4">
+        <div className="bg-white/95 text-black rounded-[28px] shadow-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -314,6 +311,18 @@ function HomePage() {
               disabled={isImageLoading || isVoiceLoading}
             >
               {isImageLoading ? <Spinner className="size-4" /> : <ImagePlus className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => void handleVoicePress()}
+              className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-lime-600 disabled:opacity-50"
+              aria-label={t.voiceAria}
+              disabled={isImageLoading || isVoiceLoading}
+            >
+              {isVoiceLoading ? (
+                <Spinner className="size-4" />
+              ) : (
+                <Mic className={`w-4 h-4 ${isListening ? 'text-red-500' : ''}`} />
+              )}
             </button>
             <button
               onClick={handleAsk}
@@ -333,23 +342,7 @@ function HomePage() {
             className="hidden"
           />
 
-          <div className="rounded-3xl bg-lime-50 border border-lime-100 p-4">
-            <div className="flex items-center justify-center">
-              <VoiceButton
-                onPress={handleVoicePress}
-                isListening={isListening}
-                isProcessing={isVoiceLoading}
-              />
-            </div>
-            <p className="mt-4 text-center text-sm font-medium text-gray-700">{statusMessage}</p>
-            <p className="mt-1 text-center text-xs text-gray-500">
-              {isListening ? t.stopVoice : t.startVoice}
-            </p>
-          </div>
-
-          <div className="px-2 text-[11px] text-gray-500">
-            {selectedImageName ? `${t.imageSelected} ${selectedImageName}` : t.tip}
-          </div>
+          <div className="px-2 text-[11px] text-gray-500">{helperText}</div>
 
           {error && (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

@@ -1,11 +1,23 @@
-import { NextRequest } from 'next/server'
-
-import { proxyJsonRequest } from '@/lib/backend-proxy'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
-  const body = await request.json()
-  return proxyJsonRequest('/api/v1/missing-info', {
-    method: 'POST',
-    body,
-  })
+  try {
+    const body = await request.json()
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/missing-info`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    })
+    const data = await response.json()
+    return NextResponse.json(data, { status: response.status })
+  } catch {
+    return NextResponse.json(
+      { code: 'PROXY_ERROR', message: 'Backend unavailable', retryable: true },
+      { status: 503 }
+    )
+  }
 }

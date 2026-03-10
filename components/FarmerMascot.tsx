@@ -22,7 +22,7 @@ export function FarmerMascot({ state = 'idle', size = 'large' }: FarmerMascotPro
       className={`${sizeClasses} relative flex items-center justify-center bg-transparent`}
       animate={state}
       variants={bodyAnimation}
-      transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' as const }}
     >
       {/* Head */}
       <div className="relative w-20 h-20 rounded-full bg-muted flex items-center justify-center border border-border">

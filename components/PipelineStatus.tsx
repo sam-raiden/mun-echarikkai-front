@@ -82,7 +82,7 @@ export function PipelineStatus({ steps }: PipelineStatusProps) {
               {step.status === 'in-progress' && (
                 <motion.div
                   animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, linear: true }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'linear' as const }}
                   className="w-2 h-2 border-2 border-primary border-t-transparent rounded-full mt-1"
                 />
               )}

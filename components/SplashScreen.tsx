@@ -41,7 +41,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     visible: {
       opacity: 1,
       scale: 1,
-      transition: { duration: 0.6, ease: 'easeOut' },
+      transition: { duration: 0.6 },
     },
   };
 
@@ -50,7 +50,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.6, ease: 'easeOut' },
+      transition: { duration: 0.6 },
     },
   };
 
@@ -66,7 +66,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
       <motion.div variants={itemVariants} className="mb-8">
         <motion.div
           animate={{ rotate: [0, 5, -5, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' as const }}
           className="text-7xl"
         >
           🌾

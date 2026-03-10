@@ -1,15 +1,17 @@
-﻿'use client';
+'use client'
 
-import { Home, MessageCircle, TrendingUp } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { Home, MessageCircle, TrendingUp } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { useRouter, usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+
+import { getStoredLanguage } from '@/lib/api'
 
 interface NavItem {
-  label: string;
-  icon: React.ReactNode;
-  href: string;
-  id: string;
+  label: string
+  icon: React.ReactNode
+  href: string
+  id: string
 }
 
 const navItems = {
@@ -53,38 +55,38 @@ const navItems = {
       id: 'market',
     },
   ],
-} as const;
+} as const
 
 export function BottomNavigation() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [language, setLanguage] = useState<'EN' | 'TA'>('EN');
+  const router = useRouter()
+  const pathname = usePathname()
+  const [language, setLanguage] = useState<'EN' | 'TA'>('EN')
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const storedLang = localStorage.getItem('appLang');
-    if (storedLang === 'TA' || storedLang === 'EN') {
-      setLanguage(storedLang);
-    }
-  }, [pathname]);
+    setLanguage(getStoredLanguage())
+  }, [pathname])
 
-  const items: NavItem[] = navItems[language];
+  const items = navItems[language]
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/';
-    if (href === '/assistant') return pathname === '/assistant' || pathname === '/chat' || pathname === '/missing-info';
-    return pathname.startsWith(href);
-  };
+    if (href === '/') return pathname === '/'
+    if (href === '/assistant') {
+      return pathname === '/assistant' || pathname === '/chat' || pathname === '/missing-info'
+    }
+    return pathname.startsWith(href)
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t border-border z-40 max-w-md mx-auto">
       <div className="flex items-center justify-around">
         {items.map((item) => {
-          const active = isActive(item.href);
+          const active = isActive(item.href)
+          const target = item.href === '/' ? `/?lang=${language}` : `${item.href}?lang=${language}`
+
           return (
             <motion.button
               key={item.id}
-              onClick={() => router.push(item.href)}
+              onClick={() => router.push(target)}
               whileTap={{ scale: 0.9 }}
               className="flex-1 flex flex-col items-center justify-center gap-1 py-3 px-2 relative"
             >
@@ -104,7 +106,6 @@ export function BottomNavigation() {
                 {item.label}
               </span>
 
-              {/* Active indicator */}
               {active && (
                 <motion.div
                   layoutId="navIndicator"
@@ -114,9 +115,9 @@ export function BottomNavigation() {
                 />
               )}
             </motion.button>
-          );
+          )
         })}
       </div>
     </div>
-  );
+  )
 }

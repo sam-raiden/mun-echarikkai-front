@@ -1,13 +1,12 @@
-'use client';
+'use client'
 
-import { Mic } from 'lucide-react';
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { Mic } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 interface VoiceButtonProps {
-  onPress?: () => void;
-  isListening?: boolean;
-  isProcessing?: boolean;
+  onPress?: () => void
+  isListening?: boolean
+  isProcessing?: boolean
 }
 
 export function VoiceButton({
@@ -15,13 +14,6 @@ export function VoiceButton({
   isListening = false,
   isProcessing = false,
 }: VoiceButtonProps) {
-  const [isActive, setIsActive] = useState(false);
-
-  const handlePress = () => {
-    setIsActive(!isActive);
-    onPress?.();
-  };
-
   const waveVariants = {
     initial: { scale: 1, opacity: 0.5 },
     animate: {
@@ -30,15 +22,16 @@ export function VoiceButton({
       transition: {
         duration: 1.5,
         repeat: Infinity,
-        ease: 'easeOut',
+        ease: 'easeOut' as const,
       },
     },
-  };
+  }
+
+  const isActive = isListening || isProcessing
 
   return (
     <div className="relative flex items-center justify-center">
-      {/* Animated background waves */}
-      {(isActive || isListening) && (
+      {isActive && (
         <>
           <motion.div
             variants={waveVariants}
@@ -56,49 +49,29 @@ export function VoiceButton({
         </>
       )}
 
-      {/* Main button */}
       <motion.button
-        onClick={handlePress}
+        type="button"
+        onClick={onPress}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        className={`relative z-10 w-24 h-24 rounded-full flex items-center justify-center font-semibold text-lg transition-all shadow-lg ${
-          isActive || isListening
+        disabled={isProcessing}
+        className={`relative z-10 w-24 h-24 rounded-full flex items-center justify-center font-semibold text-lg transition-all shadow-lg disabled:cursor-not-allowed ${
+          isActive
             ? 'bg-primary text-primary-foreground'
             : 'bg-gradient-to-br from-primary/80 to-primary/60 text-primary-foreground hover:from-primary hover:to-primary/70'
         } ${isProcessing ? 'opacity-75' : ''}`}
       >
         <motion.div
-          animate={isActive || isListening ? { rotate: [0, 360] } : {}}
+          animate={isActive ? { rotate: [0, 360] } : {}}
           transition={{
             duration: 2,
             repeat: Infinity,
-            ease: 'linear',
+            ease: 'linear' as const,
           }}
         >
           <Mic className="w-10 h-10" />
         </motion.div>
       </motion.button>
-
-      {/* Status text */}
-      {isActive && (
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute -bottom-12 text-sm font-medium text-primary"
-        >
-          Listening...
-        </motion.p>
-      )}
-
-      {isProcessing && (
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute -bottom-12 text-sm font-medium text-secondary"
-        >
-          Processing...
-        </motion.p>
-      )}
     </div>
-  );
+  )
 }

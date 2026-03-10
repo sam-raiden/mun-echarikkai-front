@@ -209,7 +209,7 @@ function HomePage() {
 
     setError(null)
     setRetryAction('voice')
-    setPendingInputType('voice')
+    setPendingInputType('text')
     recognition.lang = language === 'TA' ? 'ta-IN' : 'en-IN'
     recognition.interimResults = false
     recognition.maxAlternatives = 1
@@ -217,7 +217,7 @@ function HomePage() {
       const transcript = event.results[0][0].transcript
       setQuestion(transcript)
       setIsRecognizing(false)
-      openAssistant(transcript, 'voice')
+      openAssistant(transcript, 'text')
     }
     recognition.onerror = () => {
       setIsRecognizing(false)

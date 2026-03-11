@@ -62,9 +62,9 @@ const uiText = {
     analyzing: 'பகுப்பாய்வு செய்கிறோம்...',
     analyzingSubtext: 'சுமார் 30 விநாடிகள் ஆகும்',
     play: 'குரல் இயக்கு',
-    playing: 'இயங்குகிறது...',
-    listenTamil: 'தமிழில் கேளுங்கள்',
-    generatingAudio: 'ஆடியோ உருவாக்கப்படுகிறது...',
+    playing: '▶ இயங்குகிறது...',
+    listenTamil: '🔊 தமிழில் கேளுங்கள்',
+    generatingAudio: '⏳ ஆடியோ தயாராகிறது...',
     moreDetails: 'சில விவரங்கள் தேவை:',
     analyze: 'பகுப்பாய்வு →',
     retry: 'மீண்டும் முயற்சி',
@@ -74,10 +74,10 @@ const uiText = {
 } as const;
 
 const CARD_STYLES = [
-  { bg: '#E8F5E9', border: '#2ECC71', icon: '🌱' },
-  { bg: '#E3F2FD', border: '#3498DB', icon: '🌦️' },
-  { bg: '#FFF3E0', border: '#F39C12', icon: '💊' },
-  { bg: '#F3E5F5', border: '#9B59B6', icon: '📈' },
+  { bg: '#F0FDF4', border: '#2ECC71', icon: '🌱' },
+  { bg: '#EFF6FF', border: '#3498DB', icon: '🌦️' },
+  { bg: '#FFFBEB', border: '#F39C12', icon: '💊' },
+  { bg: '#FAF5FF', border: '#9B59B6', icon: '📈' },
 ];
 
 function AssistantPageContent() {
@@ -207,13 +207,9 @@ function AssistantPageContent() {
       const data = await res.json();
       if (data.audioUrl) {
         setAudioUrl(data.audioUrl);
-        setTimeout(() => {
-          if (audioRef.current) {
-            audioRef.current.src = data.audioUrl;
-            audioRef.current.play().catch(() => {});
-            setPlaying(true);
-          }
-        }, 800);
+        if (audioRef.current) {
+          audioRef.current.src = data.audioUrl;
+        }
       }
     } catch (e) {
       console.log('TTS error:', e);

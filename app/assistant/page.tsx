@@ -122,7 +122,7 @@ function AssistantContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: q,
-          language,
+          language: language,
           context: {
             crop: ctx.crop || '',
             location: ctx.location || '',
@@ -137,7 +137,7 @@ function AssistantContent() {
       if (data.status === 'complete' && data.result) {
         setResult(data.result)
         setContext((prev) => ({ ...prev, ...ctx }))
-        if (data.result.language === 'TA' && data.result.summary) {
+        if ((data.result.language === 'TA' || language === 'TA') && data.result.summary) {
           void fetchAudio(data.result.summary)
         }
       } else if (data.status === 'questions_needed') {
@@ -471,32 +471,33 @@ function AssistantContent() {
               ))}
             </div>
 
-            {result.language === 'TA' && (
+            {result && (result.language === 'TA' || language === 'TA') && (
               <div
                 style={{
                   background: '#E8F5E9',
                   borderRadius: '12px',
-                  padding: '10px 14px',
+                  padding: '12px 16px',
                   marginTop: '12px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px',
+                  border: '1px solid #86EFAC',
                 }}
               >
-                <span style={{ fontSize: '20px' }}>🔊</span>
+                <span style={{ fontSize: '22px' }}>🔊</span>
                 <span
                   style={{
                     flex: 1,
                     fontSize: '13px',
-                    color: '#2ECC71',
+                    color: '#16A34A',
                     fontWeight: 600,
                   }}
                 >
                   {audioUrl
                     ? playing
-                      ? 'Playing Tamil audio...'
-                      : 'Listen in Tamil'
-                    : 'Generating Tamil audio...'}
+                      ? '▶ Playing Tamil audio...'
+                      : '🔊 Listen in Tamil'
+                    : '⏳ Generating Tamil audio...'}
                 </span>
                 {audioUrl && (
                   <button
@@ -506,22 +507,20 @@ function AssistantContent() {
                       color: 'white',
                       border: 'none',
                       borderRadius: '50%',
-                      width: '32px',
-                      height: '32px',
+                      width: '36px',
+                      height: '36px',
                       cursor: 'pointer',
-                      fontSize: '14px',
+                      fontSize: '16px',
                     }}
                   >
                     {playing ? '⏸' : '▶'}
                   </button>
                 )}
-                {audioUrl && (
-                  <audio
-                    ref={audioRef}
-                    src={audioUrl}
-                    onEnded={() => setPlaying(false)}
-                  />
-                )}
+                <audio
+                  ref={audioRef}
+                  src={audioUrl || ''}
+                  onEnded={() => setPlaying(false)}
+                />
               </div>
             )}
 

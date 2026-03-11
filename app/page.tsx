@@ -3,10 +3,11 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
-import { ImagePlus, Mic, SendHorizontal, TrendingUp } from 'lucide-react'
+import { ImagePlus, SendHorizontal, TrendingUp } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 import { Spinner } from '@/components/ui/spinner'
+import { VoiceButton } from '@/components/VoiceButton'
 import {
   apiRequest,
   getFriendlyError,
@@ -15,69 +16,58 @@ import {
   type AppApiError,
   type AppLanguage,
 } from '@/lib/api'
-import { type QueryInputType } from '@/lib/farm'
 
 interface VoiceToTextResponse {
   transcript: string
+  confidence: number
+  language: string
 }
 
 interface ImageAnalysisResponse {
-  findings?: Array<{
+  findings: Array<{
     label: string
     confidence: number
   }>
-  recommendedQuery?: string
-}
-
-type WebkitWindow = Window & {
-  webkitSpeechRecognition?: new () => SpeechRecognitionLike
-  SpeechRecognition?: new () => SpeechRecognitionLike
-}
-
-interface SpeechRecognitionLike {
-  lang: string
-  interimResults: boolean
-  maxAlternatives: number
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
-  onerror: (() => void) | null
-  onend: (() => void) | null
-  start: () => void
-  stop: () => void
+  recommendedQuery: string
 }
 
 const uiText = {
   EN: {
     placeholder: 'Ask about your crop problem...',
-    helper: 'Tip: add a crop photo for better advice',
+    tip: 'Tip: add a crop photo for better advice',
     imageSelected: 'Image selected:',
     uploadAria: 'Upload crop image',
-    voiceAria: 'Speak your question',
     sendAria: 'Send question',
     marketAria: 'Open market page',
-    recording: 'Recording...',
-    recognizing: 'Listening...',
-    analyzingImage: 'Analyzing image...',
-    voiceError: 'We could not understand your voice. Please try again.',
+    listening: 'Listening to your question...',
+    transcribing: 'Turning your voice into text...',
+    analyzingImage: 'Analyzing your crop image...',
+    voiceError: 'We could not process the recording. Please try again.',
     imageError: 'We could not analyze that image. Please try another one.',
-    unsupportedVoice: 'Voice input is not available right now.',
+    unsupportedVoice: 'Voice recording is not supported in this browser.',
     retry: 'Retry',
+    startVoice: 'Tap to record',
+    stopVoice: 'Tap again to stop',
+    ready: 'Your question will open in the assistant.',
     languageLabel: 'Language',
   },
   TA: {
     placeholder: 'உங்கள் பயிர் பிரச்சினையை கேளுங்கள்...',
-    helper: 'சிறந்த ஆலோசனைக்கு பயிர் புகைப்படத்தை சேர்க்கவும்',
+    tip: 'சிறந்த ஆலோசனைக்கு பயிர் புகைப்படத்தை சேர்க்கவும்',
     imageSelected: 'தேர்ந்தெடுத்த படம்:',
     uploadAria: 'பயிர் படத்தை பதிவேற்று',
-    voiceAria: 'கேள்வியை பேசுங்கள்',
     sendAria: 'கேள்வியை அனுப்பு',
     marketAria: 'சந்தை பக்கத்தை திற',
-    recording: 'பதிவு செய்கிறோம்...',
-    recognizing: 'கேட்டு கொண்டிருக்கிறோம்...',
-    analyzingImage: 'படத்தை ஆய்வு செய்கிறோம்...',
-    voiceError: 'உங்கள் குரலைப் புரிந்துகொள்ள முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
+    listening: 'உங்கள் கேள்வியை கேட்டு கொண்டிருக்கிறோம்...',
+    transcribing: 'உங்கள் குரலை உரையாக மாற்றுகிறோம்...',
+    analyzingImage: 'பயிர் படத்தை ஆய்வு செய்கிறோம்...',
+    voiceError: 'பதிவை செயலாக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
     imageError: 'இந்த படத்தை ஆய்வு செய்ய முடியவில்லை. வேறு படத்தை முயற்சிக்கவும்.',
-    unsupportedVoice: 'குரல் உள்ளீடு இப்போது கிடைக்கவில்லை.',
+    unsupportedVoice: 'இந்த உலாவியில் குரல் பதிவு ஆதரிக்கப்படவில்லை.',
     retry: 'மீண்டும் முயற்சி',
+    startVoice: 'பதிவு தொடங்கு',
+    stopVoice: 'நிறுத்த மீண்டும் தட்டவும்',
+    ready: 'உங்கள் கேள்வி உதவி பக்கத்தில் திறக்கும்.',
     languageLabel: 'மொழி',
   },
 } as const
@@ -89,15 +79,12 @@ function HomePage() {
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const previewUrlRef = useRef<string | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
 
   const [question, setQuestion] = useState('')
   const [selectedImageName, setSelectedImageName] = useState('')
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
   const [language, setLanguage] = useState<AppLanguage>('EN')
-  const [pendingInputType, setPendingInputType] = useState<QueryInputType>('text')
-  const [isRecognizing, setIsRecognizing] = useState(false)
-  const [isRecordingFallback, setIsRecordingFallback] = useState(false)
+  const [isListening, setIsListening] = useState(false)
   const [isVoiceLoading, setIsVoiceLoading] = useState(false)
   const [isImageLoading, setIsImageLoading] = useState(false)
   const [error, setError] = useState<AppApiError | null>(null)
@@ -114,16 +101,13 @@ function HomePage() {
   useEffect(() => {
     return () => {
       mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current)
-      }
     }
   }, [])
 
   const t = uiText[language]
 
-  const openAssistant = (value: string, inputType: QueryInputType) => {
-    const trimmed = value.trim()
+  const goToAssistant = (queryText: string) => {
+    const trimmed = queryText.trim()
     if (!trimmed) {
       return
     }
@@ -131,104 +115,93 @@ function HomePage() {
     const params = new URLSearchParams()
     params.set('lang', language)
     params.set('q', trimmed)
-    params.set('inputType', inputType)
     router.push(`/assistant?${params.toString()}`)
   }
 
-  const getRecognition = () => {
-    const speechWindow = window as WebkitWindow
-    const Ctor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
-    if (!Ctor) {
-      return null
-    }
-
-    return new Ctor()
+  const handleAsk = () => {
+    setError(null)
+    goToAssistant(question)
   }
 
-  const fallbackRecordVoice = async () => {
-    if (!navigator.mediaDevices?.getUserMedia || typeof window === 'undefined' || !window.MediaRecorder) {
-      setError({ message: t.unsupportedVoice, retryable: false })
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop()
+    mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
+  }
+
+  const transcribeVoice = async (audioBlob: Blob) => {
+    setError(null)
+    setRetryAction('voice')
+    setIsVoiceLoading(true)
+
+    try {
+      const formData = new FormData()
+      formData.append(
+        'file',
+        new File([audioBlob], 'question.webm', { type: audioBlob.type || 'audio/webm' })
+      )
+
+      const data = await apiRequest<VoiceToTextResponse>('/api/voice', {
+        method: 'POST',
+        body: formData,
+      })
+
+      setQuestion(data.transcript)
+      goToAssistant(data.transcript)
+    } catch (error) {
+      setError(getFriendlyError(error, t.voiceError))
+    } finally {
+      setIsVoiceLoading(false)
+      setIsListening(false)
+    }
+  }
+
+  const handleVoicePress = async () => {
+    if (isVoiceLoading) {
       return
     }
 
-    if (isRecordingFallback) {
-      mediaRecorderRef.current?.stop()
+    if (isListening) {
+      stopRecording()
+      return
+    }
+
+    if (
+      typeof window === 'undefined' ||
+      !window.MediaRecorder ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      setError({ message: t.unsupportedVoice, retryable: false })
+      setRetryAction(null)
       return
     }
 
     try {
       setError(null)
-      setRetryAction('voice')
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      const chunks: BlobPart[] = []
-      mediaRecorderRef.current = mediaRecorder
-      setIsRecordingFallback(true)
+      const recorder = new MediaRecorder(stream)
+      audioChunksRef.current = []
+      mediaRecorderRef.current = recorder
 
-      mediaRecorder.ondataavailable = (event) => chunks.push(event.data)
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop())
-        setIsRecordingFallback(false)
-        setIsVoiceLoading(true)
-
-        try {
-          const blob = new Blob(chunks, { type: 'audio/wav' })
-          const formData = new FormData()
-          formData.append('audio', blob, 'recording.wav')
-          const data = await apiRequest<VoiceToTextResponse>('/api/voice', {
-            method: 'POST',
-            body: formData,
-          })
-          setQuestion(data.transcript)
-          setPendingInputType('voice')
-          openAssistant(data.transcript, 'voice')
-        } catch (error) {
-          setError(getFriendlyError(error, t.voiceError))
-        } finally {
-          setIsVoiceLoading(false)
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
         }
       }
 
-      mediaRecorder.start()
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || 'audio/webm',
+        })
+        await transcribeVoice(audioBlob)
+      }
+
+      recorder.start()
+      setIsListening(true)
     } catch {
       setError({ message: t.voiceError, retryable: true })
-      setIsRecordingFallback(false)
+      setRetryAction('voice')
+      setIsListening(false)
     }
-  }
-
-  const handleVoice = async () => {
-    if (isVoiceLoading || isImageLoading) {
-      return
-    }
-
-    const recognition = typeof window !== 'undefined' ? getRecognition() : null
-    if (!recognition) {
-      await fallbackRecordVoice()
-      return
-    }
-
-    setError(null)
-    setRetryAction('voice')
-    setPendingInputType('text')
-    recognition.lang = language === 'TA' ? 'ta-IN' : 'en-IN'
-    recognition.interimResults = false
-    recognition.maxAlternatives = 1
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript
-      setQuestion(transcript)
-      setIsRecognizing(false)
-      openAssistant(transcript, 'text')
-    }
-    recognition.onerror = () => {
-      setIsRecognizing(false)
-      void fallbackRecordVoice()
-    }
-    recognition.onend = () => {
-      setIsRecognizing(false)
-    }
-
-    setIsRecognizing(true)
-    recognition.start()
   }
 
   const analyzeImage = async (file: File) => {
@@ -240,18 +213,14 @@ function HomePage() {
       const formData = new FormData()
       formData.append('image', file)
       formData.append('crop', question.trim() || 'unknown')
+
       const data = await apiRequest<ImageAnalysisResponse>('/api/image-analysis', {
         method: 'POST',
         body: formData,
       })
-      const recommendedQuery =
-        data.recommendedQuery?.trim() ||
-        data.findings?.[0]?.label?.trim() ||
-        ''
 
-      setQuestion(recommendedQuery)
-      setPendingInputType('image')
-      openAssistant(recommendedQuery, 'image')
+      setQuestion(data.recommendedQuery)
+      goToAssistant(data.recommendedQuery)
     } catch (error) {
       setError(getFriendlyError(error, t.imageError))
     } finally {
@@ -261,25 +230,17 @@ function HomePage() {
 
   const handleImagePick = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) {
-      return
-    }
+    setSelectedImageName(file ? file.name : '')
+    setLastImageFile(file ?? null)
 
-    if (previewUrlRef.current) {
-      URL.revokeObjectURL(previewUrlRef.current)
+    if (file) {
+      await analyzeImage(file)
     }
-
-    const previewUrl = URL.createObjectURL(file)
-    previewUrlRef.current = previewUrl
-    setImagePreviewUrl(previewUrl)
-    setSelectedImageName(file.name)
-    setLastImageFile(file)
-    await analyzeImage(file)
   }
 
   const handleRetry = async () => {
     if (retryAction === 'voice') {
-      await handleVoice()
+      await handleVoicePress()
       return
     }
 
@@ -288,17 +249,19 @@ function HomePage() {
     }
   }
 
-  const helperText = isRecordingFallback
-    ? t.recording
-    : isRecognizing
-      ? t.recognizing
-      : isVoiceLoading
-        ? t.recording
-        : isImageLoading
-          ? t.analyzingImage
-          : selectedImageName
-            ? `${t.imageSelected} ${selectedImageName}`
-            : t.helper
+  const handleLanguageToggle = () => {
+    const nextLanguage: AppLanguage = language === 'EN' ? 'TA' : 'EN'
+    setLanguage(nextLanguage)
+    persistLanguage(nextLanguage)
+  }
+
+  const statusMessage = isVoiceLoading
+    ? t.transcribing
+    : isImageLoading
+      ? t.analyzingImage
+      : isListening
+        ? t.listening
+        : t.ready
 
   return (
     <div className="max-w-[420px] mx-auto min-h-screen relative overflow-hidden">
@@ -314,11 +277,7 @@ function HomePage() {
 
       <div className="absolute top-6 right-4 flex items-center gap-2">
         <button
-          onClick={() => {
-            const nextLanguage: AppLanguage = language === 'EN' ? 'TA' : 'EN'
-            setLanguage(nextLanguage)
-            persistLanguage(nextLanguage)
-          }}
+          onClick={handleLanguageToggle}
           className="bg-black/45 text-white text-xs rounded-full px-3 py-1.5"
           aria-label={t.languageLabel}
         >
@@ -339,15 +298,12 @@ function HomePage() {
         transition={{ delay: 0.08 }}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[90%]"
       >
-        <div className="bg-white/95 text-black rounded-[28px] shadow-xl p-4 space-y-3">
+        <div className="bg-white/95 text-black rounded-[28px] shadow-xl p-4 space-y-4">
           <div className="flex items-center gap-2">
             <input
               type="text"
               value={question}
-              onChange={(event) => {
-                setQuestion(event.target.value)
-                setPendingInputType('text')
-              }}
+              onChange={(event) => setQuestion(event.target.value)}
               placeholder={t.placeholder}
               className="flex-1 bg-transparent outline-none text-black placeholder:text-gray-500"
             />
@@ -360,19 +316,7 @@ function HomePage() {
               {isImageLoading ? <Spinner className="size-4" /> : <ImagePlus className="w-4 h-4" />}
             </button>
             <button
-              onClick={() => void handleVoice()}
-              className={`w-10 h-10 rounded-full border flex items-center justify-center disabled:opacity-50 ${
-                isRecognizing || isRecordingFallback
-                  ? 'border-red-300 bg-red-50 text-red-500'
-                  : 'border-gray-200 text-lime-600'
-              }`}
-              aria-label={t.voiceAria}
-              disabled={isImageLoading || isVoiceLoading}
-            >
-              {isVoiceLoading ? <Spinner className="size-4" /> : <Mic className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={() => openAssistant(question, pendingInputType)}
+              onClick={handleAsk}
               className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-lime-600 disabled:opacity-50"
               aria-label={t.sendAria}
               disabled={!question.trim() || isImageLoading || isVoiceLoading}
@@ -389,24 +333,22 @@ function HomePage() {
             className="hidden"
           />
 
-          <div className="flex items-center gap-3 px-2 text-[11px] text-gray-500 min-h-10">
-            {imagePreviewUrl && (
-              <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-gray-200 shrink-0">
-                <Image
-                  src={imagePreviewUrl}
-                  alt="Selected crop preview"
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              {(isRecognizing || isRecordingFallback) && (
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              )}
-              <span>{helperText}</span>
+          <div className="rounded-3xl bg-lime-50 border border-lime-100 p-4">
+            <div className="flex items-center justify-center">
+              <VoiceButton
+                onPress={handleVoicePress}
+                isListening={isListening}
+                isProcessing={isVoiceLoading}
+              />
             </div>
+            <p className="mt-4 text-center text-sm font-medium text-gray-700">{statusMessage}</p>
+            <p className="mt-1 text-center text-xs text-gray-500">
+              {isListening ? t.stopVoice : t.startVoice}
+            </p>
+          </div>
+
+          <div className="px-2 text-[11px] text-gray-500">
+            {selectedImageName ? `${t.imageSelected} ${selectedImageName}` : t.tip}
           </div>
 
           {error && (
@@ -414,7 +356,7 @@ function HomePage() {
               <p>{error.message}</p>
               {error.retryable && retryAction && (
                 <button
-                  onClick={() => void handleRetry()}
+                  onClick={handleRetry}
                   className="mt-2 inline-flex items-center rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white"
                 >
                   {t.retry}

@@ -11,13 +11,7 @@ export async function apiRequest<T>(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<T> {
-  const headers = new Headers(init?.headers)
-  headers.set('ngrok-skip-browser-warning', 'true')
-
-  const response = await fetch(input, {
-    ...init,
-    headers,
-  })
+  const response = await fetch(input, init)
   const contentType = response.headers.get('content-type') ?? ''
   const isJson = contentType.includes('application/json')
   const payload = isJson ? await response.json() : null

@@ -196,28 +196,25 @@ function AssistantPageContent() {
       );
     }
   };
-const fetchAudio = async (text: string) => {
-  try {
-    const res = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, language: 'TA' })
-    });
-    const data = await res.json();
-    if (data.audioUrl) {
-      const fullUrl = data.audioUrl.startsWith('http') 
-        ? data.audioUrl 
-        : `https://chaster-delores-glaucous.ngrok-free.dev${data.audioUrl}`;
-      setAudioUrl(fullUrl);
-      const a = new Audio(fullUrl);
-      a.play().catch(e => console.log('play error:', e));
-      a.onended = () => setPlaying(false);
-      setPlaying(true);
+  const fetchAudio = async (text: string) => {
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, language: 'TA' }),
+      });
+      const data = await res.json();
+      if (data.audioUrl) {
+        const fullUrl = data.audioUrl.startsWith('http')
+          ? data.audioUrl
+          : `https://chaster-delores-glaucous.ngrok-free.dev${data.audioUrl}`;
+        setAudioUrl(fullUrl);
+        setPlaying(false);
+      }
+    } catch (e) {
+      console.log('TTS error:', e);
     }
-  } catch (e) {
-    console.log('TTS error:', e);
-  }
-};
+  };
 
   const toggleAudio = () => {
     if (!audioUrl) return

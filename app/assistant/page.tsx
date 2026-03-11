@@ -272,163 +272,181 @@ function AssistantPageContent() {
     await submitQuery(queryText, nextContext)
   }
 
-  return (
-    <div className="h-screen flex flex-col bg-gradient-to-b from-background via-primary/5 to-background relative">
-      <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push(`/?lang=${language}`)}
-              className="p-2 hover:bg-muted rounded-full transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-foreground" />
-            </button>
-            <div>
-              <h1 className="text-lg font-bold text-foreground">{t.title}</h1>
-              <p className="text-xs text-muted-foreground">{t.subtitle}</p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              const nextLanguage: AppLanguage = language === 'EN' ? 'TA' : 'EN'
-              setLanguage(nextLanguage)
-              persistLanguage(nextLanguage)
-            }}
-            className="rounded-full border border-border px-3 py-1 text-xs text-foreground"
-          >
-            {language}
-          </button>
-        </div>
-      </div>
+  try {
+    const diagnosisDescription = result?.insights?.[0]?.description ?? ''
+    const weatherDescription = result?.insights?.[1]?.description ?? ''
+    const treatmentDescription = result?.insights?.[2]?.description ?? ''
+    const marketDescription = result?.insights?.[3]?.description ?? ''
+    void diagnosisDescription
+    void weatherDescription
+    void treatmentDescription
+    void marketDescription
 
-      <div className="flex-1 overflow-y-auto pb-40">
-        <div className="max-w-md mx-auto px-4 py-5 space-y-4">
-          {!queryText && !result && !isLoading && (
-            <div className="rounded-3xl border border-border bg-card p-5 text-sm text-muted-foreground">
-              {t.noQuery}
-            </div>
-          )}
+    if (!result && isLoading) return <div>Loading...</div>
+    if (result && !result.insights) return <div>Loading...</div>
 
-          {isLoading && (
-            <div className="rounded-3xl border border-primary/20 bg-primary/5 p-4">
-              <div className="flex items-center gap-3">
-                <Spinner className="size-5 text-primary" />
-                <p className="font-semibold text-foreground">{t.loading}</p>
+    return (
+      <div className="h-screen flex flex-col bg-gradient-to-b from-background via-primary/5 to-background relative">
+        <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border">
+          <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => router.push(`/?lang=${language}`)}
+                className="p-2 hover:bg-muted rounded-full transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-foreground" />
+              </button>
+              <div>
+                <h1 className="text-lg font-bold text-foreground">{t?.title ?? 'Assistant'}</h1>
+                <p className="text-xs text-muted-foreground">{t?.subtitle ?? ''}</p>
               </div>
             </div>
-          )}
+            <button
+              onClick={() => {
+                const nextLanguage: AppLanguage = language === 'EN' ? 'TA' : 'EN'
+                setLanguage(nextLanguage)
+                persistLanguage(nextLanguage)
+              }}
+              className="rounded-full border border-border px-3 py-1 text-xs text-foreground"
+            >
+              {language}
+            </button>
+          </div>
+        </div>
 
-          {result && (
-            <div className="rounded-3xl border border-border bg-card p-4 shadow-sm space-y-4">
-              <p className="text-sm leading-6 text-foreground">{result.summary}</p>
+        <div className="flex-1 overflow-y-auto pb-40">
+          <div className="max-w-md mx-auto px-4 py-5 space-y-4">
+            {!queryText && !result && !isLoading && (
+              <div className="rounded-3xl border border-border bg-card p-5 text-sm text-muted-foreground">
+                {t?.noQuery ?? 'Loading...'}
+              </div>
+            )}
 
-              <div className="grid grid-cols-2 gap-3">
-                {cards.map((card) => (
-                  <div
-                    key={card.type}
-                    className="rounded-2xl p-3 min-h-32 shadow-sm"
-                    style={{ backgroundColor: card.color }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <card.icon className="w-4 h-4 text-foreground" />
-                      <p className="text-sm font-semibold text-foreground">
-                        {card.insight?.title ?? card.type}
+            {isLoading && (
+              <div className="rounded-3xl border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-center gap-3">
+                  <Spinner className="size-5 text-primary" />
+                  <p className="font-semibold text-foreground">{t?.loading ?? 'Loading...'}</p>
+                </div>
+              </div>
+            )}
+
+            {result ? (
+              <div className="rounded-3xl border border-border bg-card p-4 shadow-sm space-y-4">
+                <p className="text-sm leading-6 text-foreground">{result?.summary ?? ''}</p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {cards?.map((card) => (
+                    <div
+                      key={card?.type}
+                      className="rounded-2xl p-3 min-h-32 shadow-sm"
+                      style={{ backgroundColor: card?.color }}
+                    >
+                      <div className="flex items-center gap-2">
+                        {card?.icon ? <card.icon className="w-4 h-4 text-foreground" /> : null}
+                        <p className="text-sm font-semibold text-foreground">
+                          {card?.insight?.title ?? card?.type ?? ''}
+                        </p>
+                      </div>
+                      <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                        {card?.insight?.description ?? ''}
                       </p>
                     </div>
-                    <p className="mt-3 text-xs leading-5 text-muted-foreground">
-                      {card.insight?.description ?? ''}
-                    </p>
+                  ))}
+                </div>
+
+                {language === 'TA' && audioUrl ? (
+                  <div className="rounded-2xl border border-border bg-background/80 p-3">
+                    <p className="mb-2 text-xs font-semibold text-foreground">{t?.audio ?? ''}</p>
+                    <audio controls autoPlay src={audioUrl ?? undefined} className="w-full" />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {missingFields?.length > 0 && (
+              <div className="rounded-3xl border border-border bg-card p-4 space-y-4">
+                <h2 className="text-base font-semibold text-foreground">
+                  {t?.questionsTitle ?? 'Loading...'}
+                </h2>
+                {missingFields?.map((field) => (
+                  <div key={field} className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">{t?.[field] ?? field}</label>
+                    <p className="text-xs text-muted-foreground">{questions?.[field] ?? ''}</p>
+                    <input
+                      type="text"
+                      value={answers?.[field] ?? ''}
+                      onChange={(event) =>
+                        setAnswers((current) => ({
+                          ...current,
+                          [field]: event.target.value,
+                        }))
+                      }
+                      placeholder={t?.textPlaceholder ?? ''}
+                      className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+                    />
                   </div>
                 ))}
-              </div>
 
-              {language === 'TA' && audioUrl && (
-                <div className="rounded-2xl border border-border bg-background/80 p-3">
-                  <p className="mb-2 text-xs font-semibold text-foreground">{t.audio}</p>
-                  <audio controls autoPlay src={audioUrl} className="w-full" />
-                </div>
-              )}
-            </div>
-          )}
-
-          {missingFields.length > 0 && (
-            <div className="rounded-3xl border border-border bg-card p-4 space-y-4">
-              <h2 className="text-base font-semibold text-foreground">{t.questionsTitle}</h2>
-              {missingFields.map((field) => (
-                <div key={field} className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">{t[field]}</label>
-                  <p className="text-xs text-muted-foreground">{questions[field]}</p>
-                  <input
-                    type="text"
-                    value={answers[field]}
-                    onChange={(event) =>
-                      setAnswers((current) => ({
-                        ...current,
-                        [field]: event.target.value,
-                      }))
-                    }
-                    placeholder={t.textPlaceholder}
-                    className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-                  />
-                </div>
-              ))}
-
-              <button
-                onClick={() => void handleMissingSubmit()}
-                disabled={isLoading}
-                className="w-full rounded-2xl bg-primary text-primary-foreground px-4 py-3 font-semibold disabled:opacity-60"
-              >
-                {t.submitAnswers}
-              </button>
-            </div>
-          )}
-
-          {error && (
-            <div className="rounded-3xl border border-red-200 bg-red-50 p-4 text-red-700">
-              <p className="text-sm">{error.message}</p>
-              {error.retryable && (
                 <button
-                  onClick={() => void submitQuery(queryText, context)}
-                  className="mt-3 inline-flex rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+                  onClick={() => void handleMissingSubmit()}
+                  disabled={isLoading}
+                  className="w-full rounded-2xl bg-primary text-primary-foreground px-4 py-3 font-semibold disabled:opacity-60"
                 >
-                  {t.retry}
+                  {t?.submitAnswers ?? 'Continue'}
                 </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+              </div>
+            )}
 
-      <div className="fixed bottom-20 left-0 right-0 border-t border-border bg-background/80 backdrop-blur-md">
-        <div className="max-w-md mx-auto px-4 py-3">
-          <div className="flex items-center gap-2 rounded-full bg-card/90 border border-border shadow-sm p-1">
-            <input
-              type="text"
-              placeholder={t.inputPlaceholder}
-              value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  void handleFollowUp()
-                }
-              }}
-              className="flex-1 bg-transparent rounded-full p-3 focus:outline-none text-foreground placeholder:text-muted-foreground"
-              disabled={isLoading}
-            />
-            <button
-              onClick={() => void handleFollowUp()}
-              disabled={!inputValue.trim() || isLoading}
-              className="bg-primary text-primary-foreground w-11 h-11 rounded-full hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center"
-            >
-              {isLoading ? <Spinner className="size-5" /> : <Send className="w-5 h-5" />}
-            </button>
+            {error ? (
+              <div className="rounded-3xl border border-red-200 bg-red-50 p-4 text-red-700">
+                <p className="text-sm">{error?.message ?? 'Loading...'}</p>
+                {error?.retryable ? (
+                  <button
+                    onClick={() => void submitQuery(queryText, context)}
+                    className="mt-3 inline-flex rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    {t?.retry ?? 'Retry'}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
-      </div>
 
-      <BottomNavigation />
-    </div>
-  )
+        <div className="fixed bottom-20 left-0 right-0 border-t border-border bg-background/80 backdrop-blur-md">
+          <div className="max-w-md mx-auto px-4 py-3">
+            <div className="flex items-center gap-2 rounded-full bg-card/90 border border-border shadow-sm p-1">
+              <input
+                type="text"
+                placeholder={t?.inputPlaceholder ?? 'Loading...'}
+                value={inputValue ?? ''}
+                onChange={(event) => setInputValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void handleFollowUp()
+                  }
+                }}
+                className="flex-1 bg-transparent rounded-full p-3 focus:outline-none text-foreground placeholder:text-muted-foreground"
+                disabled={isLoading}
+              />
+              <button
+                onClick={() => void handleFollowUp()}
+                disabled={!inputValue?.trim() || isLoading}
+                className="bg-primary text-primary-foreground w-11 h-11 rounded-full hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center"
+              >
+                {isLoading ? <Spinner className="size-5" /> : <Send className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <BottomNavigation />
+      </div>
+    )
+  } catch {
+    return <div>Loading...</div>
+  }
 }
 
 export default function AssistantPage() {

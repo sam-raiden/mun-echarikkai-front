@@ -75,7 +75,7 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
+  --font-sans: 'Noto Sans Tamil', 'Arial Unicode MS', sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -118,6 +118,7 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    font-family: 'Noto Sans Tamil', 'Arial Unicode MS', sans-serif;
   }
   body {
     @apply bg-background text-foreground;

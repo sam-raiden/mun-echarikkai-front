@@ -17,18 +17,33 @@ import {
   type AppLanguage,
 } from '@/lib/api'
 
-interface VoiceToTextResponse {
-  transcript: string
-  confidence: number
-  language: string
+interface QueryResponse {
+  status: 'complete' | 'questions_needed'
 }
 
 interface ImageAnalysisResponse {
-  findings: Array<{
+  findings?: Array<{
     label: string
     confidence: number
   }>
-  recommendedQuery: string
+  recommendedQuery?: string
+}
+
+type SpeechRecognitionLike = {
+  lang: string
+  interimResults: boolean
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
+  start: () => void
+}
+
+type SpeechWindow = Window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike
+}
+
+const DEFAULT_CONTEXT = {
+  land_size_acres: 2,
+  market_dependency: true,
 }
 
 const uiText = {
@@ -40,14 +55,13 @@ const uiText = {
     sendAria: 'Send question',
     marketAria: 'Open market page',
     listening: 'Listening to your question...',
-    transcribing: 'Turning your voice into text...',
     analyzingImage: 'Analyzing your crop image...',
-    voiceError: 'We could not process the recording. Please try again.',
-    imageError: 'We could not analyze that image. Please try another one.',
-    unsupportedVoice: 'Voice recording is not supported in this browser.',
+    voiceError: 'Sorry, could not connect to server. Please try again.',
+    imageError: 'Sorry, could not connect to server. Please try again.',
+    unsupportedVoice: 'Voice not supported in this browser. Please use Chrome.',
     retry: 'Retry',
     startVoice: 'Tap to record',
-    stopVoice: 'Tap again to stop',
+    stopVoice: 'Listening...',
     ready: 'Your question will open in the assistant.',
     languageLabel: 'Language',
   },
@@ -59,36 +73,34 @@ const uiText = {
     sendAria: 'கேள்வியை அனுப்பு',
     marketAria: 'சந்தை பக்கத்தை திற',
     listening: 'உங்கள் கேள்வியை கேட்டு கொண்டிருக்கிறோம்...',
-    transcribing: 'உங்கள் குரலை உரையாக மாற்றுகிறோம்...',
     analyzingImage: 'பயிர் படத்தை ஆய்வு செய்கிறோம்...',
-    voiceError: 'பதிவை செயலாக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
-    imageError: 'இந்த படத்தை ஆய்வு செய்ய முடியவில்லை. வேறு படத்தை முயற்சிக்கவும்.',
-    unsupportedVoice: 'இந்த உலாவியில் குரல் பதிவு ஆதரிக்கப்படவில்லை.',
+    voiceError: 'மன்னிக்கவும். சர்வருடன் இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
+    imageError: 'மன்னிக்கவும். சர்வருடன் இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
+    unsupportedVoice: 'இந்த உலாவியில் குரல் வசதி இல்லை. Chrome பயன்படுத்தவும்.',
     retry: 'மீண்டும் முயற்சி',
     startVoice: 'பதிவு தொடங்கு',
-    stopVoice: 'நிறுத்த மீண்டும் தட்டவும்',
+    stopVoice: 'கேட்டு கொண்டிருக்கிறது...',
     ready: 'உங்கள் கேள்வி உதவி பக்கத்தில் திறக்கும்.',
     languageLabel: 'மொழி',
   },
 } as const
 
-type RetryAction = 'voice' | 'image' | null
+type RetryAction = 'submit' | 'image' | null
 
 function HomePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
 
   const [question, setQuestion] = useState('')
   const [selectedImageName, setSelectedImageName] = useState('')
   const [language, setLanguage] = useState<AppLanguage>('EN')
   const [isListening, setIsListening] = useState(false)
-  const [isVoiceLoading, setIsVoiceLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [isImageLoading, setIsImageLoading] = useState(false)
   const [error, setError] = useState<AppApiError | null>(null)
   const [retryAction, setRetryAction] = useState<RetryAction>(null)
+  const [lastSubmittedText, setLastSubmittedText] = useState('')
   const [lastImageFile, setLastImageFile] = useState<File | null>(null)
 
   useEffect(() => {
@@ -98,115 +110,79 @@ function HomePage() {
     persistLanguage(nextLanguage)
   }, [searchParams])
 
-  useEffect(() => {
-    return () => {
-      mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
-    }
-  }, [])
-
   const t = uiText[language]
 
-  const goToAssistant = (queryText: string) => {
-    const trimmed = queryText.trim()
-    if (!trimmed) {
-      return
-    }
-
+  const navigateToAssistant = (queryText: string) => {
     const params = new URLSearchParams()
     params.set('lang', language)
-    params.set('q', trimmed)
+    params.set('q', queryText.trim())
     router.push(`/assistant?${params.toString()}`)
   }
 
-  const handleAsk = () => {
-    setError(null)
-    goToAssistant(question)
-  }
+  const handleSubmit = async (submittedText?: string) => {
+    const text = (submittedText ?? question).trim()
+    if (!text || isSubmitting || isImageLoading) {
+      return
+    }
 
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop()
-    mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
-  }
-
-  const transcribeVoice = async (audioBlob: Blob) => {
     setError(null)
-    setRetryAction('voice')
-    setIsVoiceLoading(true)
+    setRetryAction('submit')
+    setLastSubmittedText(text)
+    setIsSubmitting(true)
 
     try {
-      const formData = new FormData()
-      formData.append(
-        'file',
-        new File([audioBlob], 'question.webm', { type: audioBlob.type || 'audio/webm' })
-      )
-
-      const data = await apiRequest<VoiceToTextResponse>('/api/voice', {
+      await apiRequest<QueryResponse>('/api/query', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: text,
+          language,
+          context: DEFAULT_CONTEXT,
+        }),
       })
 
-      setQuestion(data.transcript)
-      goToAssistant(data.transcript)
-    } catch (error) {
-      setError(getFriendlyError(error, t.voiceError))
+      navigateToAssistant(text)
+    } catch (caughtError) {
+      setError(getFriendlyError(caughtError, t.voiceError))
     } finally {
-      setIsVoiceLoading(false)
-      setIsListening(false)
+      setIsSubmitting(false)
     }
   }
 
-  const handleVoicePress = async () => {
-    if (isVoiceLoading) {
+  const startVoice = () => {
+    if (typeof window === 'undefined') {
       return
     }
 
-    if (isListening) {
-      stopRecording()
-      return
-    }
-
-    if (
-      typeof window === 'undefined' ||
-      !window.MediaRecorder ||
-      !navigator.mediaDevices?.getUserMedia
-    ) {
+    const SR =
+      (window as SpeechWindow).SpeechRecognition ||
+      (window as SpeechWindow).webkitSpeechRecognition
+    if (!SR) {
       setError({ message: t.unsupportedVoice, retryable: false })
-      setRetryAction(null)
       return
     }
 
-    try {
-      setError(null)
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
-      audioChunksRef.current = []
-      mediaRecorderRef.current = recorder
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data)
-        }
-      }
-
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, {
-          type: recorder.mimeType || 'audio/webm',
-        })
-        await transcribeVoice(audioBlob)
-      }
-
-      recorder.start()
-      setIsListening(true)
-    } catch {
-      setError({ message: t.voiceError, retryable: true })
-      setRetryAction('voice')
+    const recognition = new SR()
+    recognition.lang = language === 'TA' ? 'ta-IN' : 'en-IN'
+    recognition.interimResults = false
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript
+      setQuestion(transcript)
       setIsListening(false)
+      void handleSubmit(transcript)
     }
+
+    setError(null)
+    setIsListening(true)
+    recognition.start()
   }
 
   const analyzeImage = async (file: File) => {
     setError(null)
     setRetryAction('image')
+    setLastImageFile(file)
     setIsImageLoading(true)
 
     try {
@@ -219,10 +195,15 @@ function HomePage() {
         body: formData,
       })
 
-      setQuestion(data.recommendedQuery)
-      goToAssistant(data.recommendedQuery)
-    } catch (error) {
-      setError(getFriendlyError(error, t.imageError))
+      const nextQuery =
+        data.recommendedQuery?.trim() ||
+        data.findings?.[0]?.label?.trim() ||
+        ''
+
+      setQuestion(nextQuery)
+      await handleSubmit(nextQuery)
+    } catch (caughtError) {
+      setError(getFriendlyError(caughtError, t.imageError))
     } finally {
       setIsImageLoading(false)
     }
@@ -230,8 +211,8 @@ function HomePage() {
 
   const handleImagePick = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
+    event.target.value = ''
     setSelectedImageName(file ? file.name : '')
-    setLastImageFile(file ?? null)
 
     if (file) {
       await analyzeImage(file)
@@ -239,9 +220,8 @@ function HomePage() {
   }
 
   const handleRetry = async () => {
-    if (retryAction === 'voice') {
-      await handleVoicePress()
-      return
+    if (retryAction === 'submit' && lastSubmittedText) {
+      await handleSubmit(lastSubmittedText)
     }
 
     if (retryAction === 'image' && lastImageFile) {
@@ -249,19 +229,13 @@ function HomePage() {
     }
   }
 
-  const handleLanguageToggle = () => {
-    const nextLanguage: AppLanguage = language === 'EN' ? 'TA' : 'EN'
-    setLanguage(nextLanguage)
-    persistLanguage(nextLanguage)
-  }
-
-  const statusMessage = isVoiceLoading
-    ? t.transcribing
-    : isImageLoading
-      ? t.analyzingImage
-      : isListening
-        ? t.listening
-        : t.ready
+  const helperText = isImageLoading
+    ? t.analyzingImage
+    : isListening
+      ? t.stopVoice
+      : selectedImageName
+        ? `${t.imageSelected} ${selectedImageName}`
+        : t.tip
 
   return (
     <div className="max-w-[420px] mx-auto min-h-screen relative overflow-hidden">
@@ -277,7 +251,11 @@ function HomePage() {
 
       <div className="absolute top-6 right-4 flex items-center gap-2">
         <button
-          onClick={handleLanguageToggle}
+          onClick={() => {
+            const nextLanguage: AppLanguage = language === 'EN' ? 'TA' : 'EN'
+            setLanguage(nextLanguage)
+            persistLanguage(nextLanguage)
+          }}
           className="bg-black/45 text-white text-xs rounded-full px-3 py-1.5"
           aria-label={t.languageLabel}
         >
@@ -311,17 +289,17 @@ function HomePage() {
               onClick={() => fileInputRef.current?.click()}
               className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-lime-600 disabled:opacity-50"
               aria-label={t.uploadAria}
-              disabled={isImageLoading || isVoiceLoading}
+              disabled={isImageLoading || isSubmitting}
             >
               {isImageLoading ? <Spinner className="size-4" /> : <ImagePlus className="w-4 h-4" />}
             </button>
             <button
-              onClick={handleAsk}
+              onClick={() => void handleSubmit()}
               className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-lime-600 disabled:opacity-50"
               aria-label={t.sendAria}
-              disabled={!question.trim() || isImageLoading || isVoiceLoading}
+              disabled={!question.trim() || isImageLoading || isSubmitting}
             >
-              <SendHorizontal className="w-4 h-4" />
+              {isSubmitting ? <Spinner className="size-4" /> : <SendHorizontal className="w-4 h-4" />}
             </button>
           </div>
 
@@ -336,27 +314,27 @@ function HomePage() {
           <div className="rounded-3xl bg-lime-50 border border-lime-100 p-4">
             <div className="flex items-center justify-center">
               <VoiceButton
-                onPress={handleVoicePress}
+                onPress={startVoice}
                 isListening={isListening}
-                isProcessing={isVoiceLoading}
+                isProcessing={isSubmitting}
               />
             </div>
-            <p className="mt-4 text-center text-sm font-medium text-gray-700">{statusMessage}</p>
+            <p className="mt-4 text-center text-sm font-medium text-gray-700">
+              {isListening ? t.listening : t.ready}
+            </p>
             <p className="mt-1 text-center text-xs text-gray-500">
               {isListening ? t.stopVoice : t.startVoice}
             </p>
           </div>
 
-          <div className="px-2 text-[11px] text-gray-500">
-            {selectedImageName ? `${t.imageSelected} ${selectedImageName}` : t.tip}
-          </div>
+          <div className="px-2 text-[11px] text-gray-500">{helperText}</div>
 
           {error && (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               <p>{error.message}</p>
               {error.retryable && retryAction && (
                 <button
-                  onClick={handleRetry}
+                  onClick={() => void handleRetry()}
                   className="mt-2 inline-flex items-center rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white"
                 >
                   {t.retry}

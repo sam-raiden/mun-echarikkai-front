@@ -11,7 +11,13 @@ export async function apiRequest<T>(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<T> {
-  const response = await fetch(input, init)
+  const headers = new Headers(init?.headers)
+  headers.set('ngrok-skip-browser-warning', 'true')
+
+  const response = await fetch(input, {
+    ...init,
+    headers,
+  })
   const contentType = response.headers.get('content-type') ?? ''
   const isJson = contentType.includes('application/json')
   const payload = isJson ? await response.json() : null
@@ -47,14 +53,9 @@ export function persistLanguage(language: AppLanguage) {
 }
 
 export function getFriendlyError(error: unknown, fallback: string): AppApiError {
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    const message =
-      typeof error.message === 'string' && error.message.trim()
-        ? error.message
-        : fallback
-
+  if (typeof error === 'object' && error !== null) {
     return {
-      message,
+      message: fallback,
       retryable:
         'retryable' in error && typeof error.retryable === 'boolean'
           ? error.retryable

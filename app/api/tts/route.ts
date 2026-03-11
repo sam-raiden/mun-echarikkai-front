@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
       data.audioUrl = `${BACKEND}${data.audioUrl}`
     }
     return NextResponse.json(data)
-  } catch {
+  } catch (error) {
+    console.error('TTS error:', error)
     return NextResponse.json({ error: 'TTS unavailable' }, { status: 503 })
   }
 }

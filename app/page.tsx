@@ -116,9 +116,24 @@ function HomePageContent() {
   const t = uiText[language]
 
   const navigateToAssistant = (queryText: string) => {
-    const params = new URLSearchParams()
-    params.set('lang', language)
-    params.set('q', queryText.trim())
+    const lower = queryText.toLowerCase()
+    const crops = ['onion', 'tomato', 'rice', 'banana', 'cotton', 'sugarcane', 'chilli', 'brinjal', 'corn', 'wheat']
+    const crop = crops.find((item) => lower.includes(item)) || ''
+    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
+    const month = months.find((item) => lower.includes(item)) || ''
+    const irrigations = ['borewell', 'canal', 'rainfed', 'drip', 'sprinkler']
+    const irrigation = irrigations.find((item) => lower.includes(item)) || ''
+    const locationMatch = queryText.match(/\b(?:in|at)\s+([A-Za-z\s]+?)(?:\s+(?:with|using|during|for)\b|$)/i)
+    const location = locationMatch?.[1]?.trim() || ''
+
+    const params = new URLSearchParams({
+      q: queryText.trim(),
+      lang: language,
+      crop,
+      location,
+      month,
+      irrigation,
+    })
     router.push(`/assistant?${params.toString()}`)
   }
 

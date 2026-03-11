@@ -51,6 +51,10 @@ function AssistantContent() {
   const router = useRouter()
   const query = searchParams.get('q') || ''
   const lang = searchParams.get('lang') || 'EN'
+  const cropParam = searchParams.get('crop') || ''
+  const locationParam = searchParams.get('location') || ''
+  const monthParam = searchParams.get('month') || ''
+  const irrigationParam = searchParams.get('irrigation') || ''
   const [language, setLanguage] = useState(lang)
   const [result, setResult] = useState<QueryResult | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
@@ -62,21 +66,56 @@ function AssistantContent() {
   const [playing, setPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   const [context, setContext] = useState({
+    crop: cropParam,
+    location: locationParam,
+    month: monthParam,
+    irrigation: irrigationParam,
     land_size_acres: 2,
     market_dependency: true,
   })
 
   useEffect(() => {
     if (query) {
-      void runQuery(query, {})
+      void runQuery(query, {
+        crop: cropParam,
+        location: locationParam,
+        month: monthParam,
+        irrigation: irrigationParam,
+        land_size_acres: 2,
+        market_dependency: true,
+      })
     }
   }, [])
+
+  const fetchAudio = async (text: string) => {
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, language: 'TA' }),
+      })
+      const data = await response.json()
+      if (data.audioUrl) {
+        setAudioUrl(data.audioUrl)
+        setTimeout(() => {
+          if (audioRef.current) {
+            void audioRef.current.play()
+            setPlaying(true)
+          }
+        }, 500)
+      }
+    } catch (caughtError) {
+      console.log('TTS error:', caughtError)
+    }
+  }
 
   const runQuery = async (q: string, ctx: Record<string, any>) => {
     setLoading(true)
     setError('')
     setResult(null)
     setQuestions([])
+    setAudioUrl(null)
+    setPlaying(false)
     try {
       const response = await fetch('/api/query', {
         method: 'POST',
@@ -84,7 +123,14 @@ function AssistantContent() {
         body: JSON.stringify({
           query: q,
           language,
-          context: { ...context, ...ctx },
+          context: {
+            crop: ctx.crop || '',
+            location: ctx.location || '',
+            month: ctx.month || '',
+            irrigation: ctx.irrigation || '',
+            land_size_acres: ctx.land_size_acres || 2,
+            market_dependency: ctx.market_dependency ?? true,
+          },
         }),
       })
       const data = await response.json()
@@ -103,22 +149,6 @@ function AssistantContent() {
       setError('Could not connect to server. Make sure backend is running.')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchAudio = async (text: string) => {
-    try {
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language: 'TA' }),
-      })
-      const data = await response.json()
-      if (data.audioUrl) {
-        setAudioUrl(data.audioUrl)
-      }
-    } catch (caughtError) {
-      console.log('TTS error:', caughtError)
     }
   }
 
@@ -206,7 +236,7 @@ function AssistantContent() {
           🌾 Farm Analysis
         </span>
         <button
-          onClick={() => setLanguage((l) => (l === 'EN' ? 'TA' : 'EN'))}
+          onClick={() => setLanguage((current) => (current === 'EN' ? 'TA' : 'EN'))}
           style={{
             background: '#f3f4f6',
             border: 'none',
@@ -442,7 +472,49 @@ function AssistantContent() {
             </div>
 
             {result.language === 'TA' && (
-              <div>
+              <div
+                style={{
+                  background: '#E8F5E9',
+                  borderRadius: '12px',
+                  padding: '10px 14px',
+                  marginTop: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                }}
+              >
+                <span style={{ fontSize: '20px' }}>🔊</span>
+                <span
+                  style={{
+                    flex: 1,
+                    fontSize: '13px',
+                    color: '#2ECC71',
+                    fontWeight: 600,
+                  }}
+                >
+                  {audioUrl
+                    ? playing
+                      ? 'Playing Tamil audio...'
+                      : 'Listen in Tamil'
+                    : 'Generating Tamil audio...'}
+                </span>
+                {audioUrl && (
+                  <button
+                    onClick={toggleAudio}
+                    style={{
+                      background: '#2ECC71',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '32px',
+                      height: '32px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                    }}
+                  >
+                    {playing ? '⏸' : '▶'}
+                  </button>
+                )}
                 {audioUrl && (
                   <audio
                     ref={audioRef}
@@ -450,22 +522,6 @@ function AssistantContent() {
                     onEnded={() => setPlaying(false)}
                   />
                 )}
-                <button
-                  onClick={toggleAudio}
-                  style={{
-                    background: '#E8F5E9',
-                    border: 'none',
-                    borderRadius: '20px',
-                    padding: '8px 16px',
-                    fontSize: '13px',
-                    color: '#2ECC71',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    width: '100%',
-                  }}
-                >
-                  {playing ? '⏸ Pause' : '🔊 Listen in Tamil'}
-                </button>
               </div>
             )}
 

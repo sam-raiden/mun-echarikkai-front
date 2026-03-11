@@ -705,7 +705,7 @@ function AssistantPageContent() {
                             width: '36px',
                             height: '36px',
                             borderRadius: '50%',
-                            background: '#2ECC71',
+                            background: '#e8ebe9',
                             border: 'none',
                             color: 'white',
                             fontSize: '14px',

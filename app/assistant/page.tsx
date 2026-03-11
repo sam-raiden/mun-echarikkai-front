@@ -209,6 +209,10 @@ function AssistantPageContent() {
           ? data.audioUrl
           : `https://chaster-delores-glaucous.ngrok-free.dev${data.audioUrl}`;
         setAudioUrl(fullUrl);
+        if (audioRef.current) {
+          audioRef.current.src = fullUrl;
+          audioRef.current.load();
+        }
         setPlaying(false);
       }
     } catch (e) {
@@ -710,13 +714,7 @@ function AssistantPageContent() {
                         }}
                       >
                           <button
-                            onClick={() => {
-                              if (!audioUrl) return
-                              const a = new Audio(audioUrl)
-                              a.play()
-                              setPlaying(true)
-                              a.onended = () => setPlaying(false)
-                            }}
+                            onClick={toggleAudio}
                             style={{
                               width: '36px',
                               height: '36px',
@@ -866,6 +864,7 @@ function AssistantPageContent() {
         ref={audioRef}
         src={audioUrl || ''}
         onEnded={() => { setPlaying(false) }}
+        preload="auto"
         style={{ display: 'none' }}
       />
 

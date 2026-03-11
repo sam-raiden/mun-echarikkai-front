@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-const BACKEND =
-  process.env.NEXT_PUBLIC_API_URL || 'https://chaster-delores-glaucous.ngrok-free.dev'
+
+const BACKEND = 'https://chaster-delores-glaucous.ngrok-free.dev'
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -8,17 +9,16 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
+        'ngrok-skip-browser-warning': 'true'
       },
-      body: JSON.stringify({ text: body.text, language: body.language || 'TA' }),
+      body: JSON.stringify({ text: body.text, language: body.language || 'TA' })
     })
     const data = await response.json()
-    if (data.audioUrl && data.audioUrl.startsWith('/')) {
+    if (data.audioUrl) {
       data.audioUrl = `${BACKEND}${data.audioUrl}`
     }
     return NextResponse.json(data)
   } catch (error) {
-    console.error('TTS error:', error)
     return NextResponse.json({ error: 'TTS unavailable' }, { status: 503 })
   }
 }

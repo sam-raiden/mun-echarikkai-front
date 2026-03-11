@@ -202,13 +202,14 @@ function AssistantPageContent() {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language: 'TA' }),
+        body: JSON.stringify({ text, language: 'TA' })
       });
       const data = await res.json();
       if (data.audioUrl) {
         setAudioUrl(data.audioUrl);
         if (audioRef.current) {
           audioRef.current.src = data.audioUrl;
+          audioRef.current.load();
         }
       }
     } catch (e) {
@@ -217,13 +218,20 @@ function AssistantPageContent() {
   };
 
   const toggleAudio = () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || !audioUrl) return;
     if (playing) {
       audioRef.current.pause();
       setPlaying(false);
     } else {
-      audioRef.current.play();
-      setPlaying(true);
+      audioRef.current.src = audioUrl;
+      audioRef.current.load();
+      audioRef.current
+        .play()
+        .then(() => setPlaying(true))
+        .catch((e) => {
+          console.log('Play error:', e);
+          setPlaying(false);
+        });
     }
   };
 
@@ -746,11 +754,6 @@ function AssistantPageContent() {
                             ))}
                           </div>
                         </div>
-                        <audio
-                          ref={audioRef}
-                          src={audioUrl || ''}
-                          onEnded={() => setPlaying(false)}
-                        />
                       </div>
                     )}
                   </div>
@@ -850,6 +853,13 @@ function AssistantPageContent() {
         })}
         <div ref={bottomRef} />
       </div>
+
+      <audio
+        ref={audioRef}
+        src={audioUrl || ''}
+        onEnded={() => setPlaying(false)}
+        style={{ display: 'none' }}
+      />
 
       <div
         style={{

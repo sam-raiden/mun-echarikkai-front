@@ -111,7 +111,7 @@ function getRequiredFields(fields: string[]) {
   )
 }
 
-function AssistantPageContent() {
+function AssistantPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -449,10 +449,24 @@ function AssistantPageContent() {
   }
 }
 
-export default function AssistantPage() {
+export default function AssistantPageWrapper() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background" />}>
-      <AssistantPageContent />
+    <Suspense
+      fallback={
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '100vh',
+            fontSize: '18px',
+          }}
+        >
+          🌾 Loading...
+        </div>
+      }
+    >
+      <AssistantPage />
     </Suspense>
   )
 }

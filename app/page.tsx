@@ -32,6 +32,9 @@ interface ImageAnalysisResponse {
 type SpeechRecognitionLike = {
   lang: string
   interimResults: boolean
+  onstart: (() => void) | null
+  onerror: (() => void) | null
+  onend: (() => void) | null
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
   start: () => void
 }
@@ -87,12 +90,12 @@ const uiText = {
 
 type RetryAction = 'submit' | 'image' | null
 
-function HomePage() {
+function HomePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [question, setQuestion] = useState('')
+  const [query, setQuery] = useState('')
   const [selectedImageName, setSelectedImageName] = useState('')
   const [language, setLanguage] = useState<AppLanguage>('EN')
   const [isListening, setIsListening] = useState(false)
@@ -120,7 +123,7 @@ function HomePage() {
   }
 
   const handleSubmit = async (submittedText?: string) => {
-    const text = (submittedText ?? question).trim()
+    const text = (submittedText ?? query).trim()
     if (!text || isSubmitting || isImageLoading) {
       return
     }
@@ -151,7 +154,7 @@ function HomePage() {
     }
   }
 
-  const startVoice = () => {
+  const handleVoice = () => {
     if (typeof window === 'undefined') {
       return
     }
@@ -160,7 +163,7 @@ function HomePage() {
       (window as SpeechWindow).SpeechRecognition ||
       (window as SpeechWindow).webkitSpeechRecognition
     if (!SR) {
-      setError({ message: t.unsupportedVoice, retryable: false })
+      alert('Please use Chrome for voice input')
       return
     }
 
@@ -169,13 +172,12 @@ function HomePage() {
     recognition.interimResults = false
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript
-      setQuestion(transcript)
-      setIsListening(false)
+      setQuery(transcript)
       void handleSubmit(transcript)
     }
-
-    setError(null)
-    setIsListening(true)
+    recognition.onerror = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false)
+    recognition.onstart = () => setIsListening(true)
     recognition.start()
   }
 
@@ -188,7 +190,7 @@ function HomePage() {
     try {
       const formData = new FormData()
       formData.append('image', file)
-      formData.append('crop', question.trim() || 'unknown')
+      formData.append('crop', query.trim() || 'unknown')
 
       const data = await apiRequest<ImageAnalysisResponse>('/api/image-analysis', {
         method: 'POST',
@@ -200,7 +202,7 @@ function HomePage() {
         data.findings?.[0]?.label?.trim() ||
         ''
 
-      setQuestion(nextQuery)
+      setQuery(nextQuery)
       await handleSubmit(nextQuery)
     } catch (caughtError) {
       setError(getFriendlyError(caughtError, t.imageError))
@@ -280,8 +282,8 @@ function HomePage() {
           <div className="flex items-center gap-2">
             <input
               type="text"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
               placeholder={t.placeholder}
               className="flex-1 bg-transparent outline-none text-black placeholder:text-gray-500"
             />
@@ -297,7 +299,7 @@ function HomePage() {
               onClick={() => void handleSubmit()}
               className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-lime-600 disabled:opacity-50"
               aria-label={t.sendAria}
-              disabled={!question.trim() || isImageLoading || isSubmitting}
+              disabled={!query.trim() || isImageLoading || isSubmitting}
             >
               {isSubmitting ? <Spinner className="size-4" /> : <SendHorizontal className="w-4 h-4" />}
             </button>
@@ -314,7 +316,7 @@ function HomePage() {
           <div className="rounded-3xl bg-lime-50 border border-lime-100 p-4">
             <div className="flex items-center justify-center">
               <VoiceButton
-                onPress={startVoice}
+                  onPress={handleVoice}
                 isListening={isListening}
                 isProcessing={isSubmitting}
               />
@@ -350,8 +352,26 @@ function HomePage() {
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-black" />}>
-      <HomePage />
+    <Suspense
+      fallback={
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '100vh',
+            background: '#f9fafb',
+          }}
+        >
+          <div style={{ fontSize: '48px' }}>🌾</div>
+          <div style={{ marginTop: '16px', fontSize: '16px', color: '#666' }}>
+            Loading...
+          </div>
+        </div>
+      }
+    >
+      <HomePageContent />
     </Suspense>
   )
 }

@@ -1,33 +1,10 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Cloud, Leaf, Pill, Send, TrendingUp } from 'lucide-react'
-import { useRouter, useSearchParams } from 'next/navigation'
-
-import { BottomNavigation } from '@/components/BottomNavigation'
-import { Spinner } from '@/components/ui/spinner'
-import {
-  apiRequest,
-  getFriendlyError,
-  getStoredLanguage,
-  persistLanguage,
-  type AppApiError,
-  type AppLanguage,
-} from '@/lib/api'
-
-type RequiredField = 'crop' | 'location' | 'month' | 'irrigation'
-
-interface FarmContext {
-  crop: string | null
-  location: string | null
-  month: string | null
-  irrigation: string | null
-  land_size_acres: number
-  market_dependency: boolean
-}
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 interface Insight {
-  type: 'diagnosis' | 'weather' | 'treatment' | 'market'
+  type: string
   title: string
   description: string
 }
@@ -35,438 +12,577 @@ interface Insight {
 interface QueryResult {
   summary: string
   insights: Insight[]
-  language: AppLanguage
+  risk_score: number
+  final_score: number
+  confidence_level: string
+  language: string
   audio_url: string | null
 }
 
-interface QueryResponse {
-  status: 'complete' | 'questions_needed'
-  questions: string[]
-  missing_fields: string[]
-  result: QueryResult | null
+interface Question {
+  field: string
+  question: string
+  question_ta: string
 }
 
-interface TtsResponse {
-  audioUrl: string
+const CARD_COLORS: Record<string, string> = {
+  diagnosis: '#E8F5E9',
+  weather: '#E3F2FD',
+  treatment: '#FFF3E0',
+  market: '#F3E5F5',
 }
 
-const DEFAULT_CONTEXT: FarmContext = {
-  crop: null,
-  location: null,
-  month: null,
-  irrigation: null,
-  land_size_acres: 2,
-  market_dependency: true,
+const CARD_BORDERS: Record<string, string> = {
+  diagnosis: '#2ECC71',
+  weather: '#3498DB',
+  treatment: '#F39C12',
+  market: '#9B59B6',
 }
 
-const REQUIRED_FIELDS: RequiredField[] = ['crop', 'location', 'month', 'irrigation']
-
-const insightDesign = [
-  { type: 'diagnosis', icon: Leaf, color: '#E8F5E9' },
-  { type: 'weather', icon: Cloud, color: '#E3F2FD' },
-  { type: 'treatment', icon: Pill, color: '#FFF3E0' },
-  { type: 'market', icon: TrendingUp, color: '#F3E5F5' },
-] as const
-
-const uiText = {
-  EN: {
-    title: 'Farm Assistant',
-    subtitle: 'Your AI farming guide',
-    inputPlaceholder: 'Ask a follow-up question...',
-    loading: 'Analyzing...',
-    followUpError: 'Sorry, could not connect to server. Please try again.',
-    questionsTitle: 'A few details will improve the advice',
-    submitAnswers: 'Continue analysis',
-    retry: 'Retry',
-    noQuery: 'Start from the home page or ask a question below.',
-    audio: 'Tamil audio',
-    crop: 'Crop',
-    location: 'Location',
-    month: 'Month',
-    irrigation: 'Irrigation',
-    textPlaceholder: 'Type your answer',
-  },
-  TA: {
-    title: 'பண்ணை உதவியாளர்',
-    subtitle: 'உங்கள் AI விவசாய வழிகாட்டி',
-    inputPlaceholder: 'அடுத்த கேள்வியை கேளுங்கள்...',
-    loading: 'ஆய்வு செய்கிறோம்...',
-    followUpError: 'மன்னிக்கவும். சர்வருடன் இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',
-    questionsTitle: 'சில விவரங்கள் ஆலோசனையை மேம்படுத்தும்',
-    submitAnswers: 'ஆய்வை தொடர்க',
-    retry: 'மீண்டும் முயற்சி',
-    noQuery: 'முகப்பு பக்கத்தில் இருந்து தொடங்குங்கள் அல்லது கீழே கேள்வி கேளுங்கள்.',
-    audio: 'தமிழ் ஒலி',
-    crop: 'பயிர்',
-    location: 'இடம்',
-    month: 'மாதம்',
-    irrigation: 'நீர்ப்பாசனம்',
-    textPlaceholder: 'உங்கள் பதிலை உள்ளிடுங்கள்',
-  },
-} as const
-
-function getRequiredFields(fields: string[]) {
-  return fields.filter((field): field is RequiredField =>
-    REQUIRED_FIELDS.includes(field as RequiredField)
-  )
+const CARD_ICONS: Record<string, string> = {
+  diagnosis: '🌱',
+  weather: '🌦️',
+  treatment: '💊',
+  market: '📈',
 }
 
-function AssistantPage() {
-  const router = useRouter()
+function AssistantContent() {
   const searchParams = useSearchParams()
-
-  const [language, setLanguage] = useState<AppLanguage>('EN')
-  const [inputValue, setInputValue] = useState('')
-  const [queryText, setQueryText] = useState('')
-  const [context, setContext] = useState<FarmContext>(DEFAULT_CONTEXT)
+  const router = useRouter()
+  const query = searchParams.get('q') || ''
+  const lang = searchParams.get('lang') || 'EN'
+  const [language, setLanguage] = useState(lang)
   const [result, setResult] = useState<QueryResult | null>(null)
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [followUp, setFollowUp] = useState('')
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<AppApiError | null>(null)
-  const [missingFields, setMissingFields] = useState<RequiredField[]>([])
-  const [questions, setQuestions] = useState<Record<RequiredField, string>>({
-    crop: '',
-    location: '',
-    month: '',
-    irrigation: '',
-  })
-  const [answers, setAnswers] = useState<Record<RequiredField, string>>({
-    crop: '',
-    location: '',
-    month: '',
-    irrigation: '',
+  const [playing, setPlaying] = useState(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const [context, setContext] = useState({
+    land_size_acres: 2,
+    market_dependency: true,
   })
 
-  const t = uiText[language]
-
-  const requestedLanguage =
-    searchParams.get('lang') === 'TA' || searchParams.get('lang') === 'EN'
-      ? (searchParams.get('lang') as AppLanguage)
-      : language
-
   useEffect(() => {
-    const urlLang = searchParams.get('lang')
-    const nextLanguage = urlLang === 'TA' || urlLang === 'EN' ? urlLang : getStoredLanguage()
-    setLanguage(nextLanguage)
-    persistLanguage(nextLanguage)
-  }, [searchParams])
-
-  useEffect(() => {
-    const q = searchParams.get('q')?.trim() ?? ''
-    if (!q) {
-      return
+    if (query) {
+      void runQuery(query, {})
     }
+  }, [])
 
-    setQueryText(q)
-    void submitQuery(q, DEFAULT_CONTEXT, requestedLanguage)
-  }, [requestedLanguage, searchParams])
-
-  const cards = useMemo(
-    () =>
-      insightDesign.map((card) => ({
-        ...card,
-        insight: result?.insights.find((item) => item.type === card.type),
-      })),
-    [result]
-  )
-
-  const submitQuery = async (
-    nextQuery: string,
-    nextContext: FarmContext,
-    requestLanguage: AppLanguage = language
-  ) => {
-    if (!nextQuery.trim()) {
-      return
-    }
-
-    setError(null)
-    setIsLoading(true)
-
+  const runQuery = async (q: string, ctx: Record<string, any>) => {
+    setLoading(true)
+    setError('')
+    setResult(null)
+    setQuestions([])
     try {
-      const data = await apiRequest<QueryResponse>('/api/query', {
+      const response = await fetch('/api/query', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: nextQuery.trim(),
-          language: requestLanguage,
-          context: nextContext,
+          query: q,
+          language,
+          context: { ...context, ...ctx },
         }),
       })
-
-      if (data.status === 'questions_needed') {
-        const requiredFields = getRequiredFields(data.missing_fields)
-        const nextQuestions = {
-          crop: '',
-          location: '',
-          month: '',
-          irrigation: '',
+      const data = await response.json()
+      if (data.status === 'complete' && data.result) {
+        setResult(data.result)
+        setContext((prev) => ({ ...prev, ...ctx }))
+        if (data.result.language === 'TA' && data.result.summary) {
+          void fetchAudio(data.result.summary)
         }
-
-        requiredFields.forEach((field) => {
-          const index = data.missing_fields.findIndex((item) => item === field)
-          nextQuestions[field] = index >= 0 ? data.questions[index] : ''
-        })
-
-        setMissingFields(requiredFields)
-        setQuestions(nextQuestions)
-        setResult(null)
-        setAudioUrl(null)
-        return
+      } else if (data.status === 'questions_needed') {
+        setQuestions(data.questions || [])
+      } else {
+        setError('Could not get analysis. Please try again.')
       }
-
-      if (!data.result) {
-        throw { message: t.followUpError, retryable: true } satisfies AppApiError
-      }
-
-      let nextAudioUrl = data.result.audio_url
-      if (requestLanguage === 'TA' && !nextAudioUrl) {
-        const ttsData = await apiRequest<TtsResponse>('/api/tts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: data.result.summary,
-            language: requestLanguage,
-          }),
-        })
-
-        nextAudioUrl = ttsData.audioUrl
-      }
-
-      setContext(nextContext)
-      setResult(data.result)
-      setAudioUrl(nextAudioUrl)
-      setMissingFields([])
-    } catch (caughtError) {
-      setError(getFriendlyError(caughtError, t.followUpError))
+    } catch {
+      setError('Could not connect to server. Make sure backend is running.')
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  const handleFollowUp = async () => {
-    if (!inputValue.trim() || isLoading) {
+  const fetchAudio = async (text: string) => {
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, language: 'TA' }),
+      })
+      const data = await response.json()
+      if (data.audioUrl) {
+        setAudioUrl(data.audioUrl)
+      }
+    } catch (caughtError) {
+      console.log('TTS error:', caughtError)
+    }
+  }
+
+  const handleMissingInfoSubmit = () => {
+    const ctx: Record<string, string> = {}
+    questions.forEach((questionItem) => {
+      if (answers[questionItem.field]) {
+        ctx[questionItem.field] = answers[questionItem.field]
+      }
+    })
+    void runQuery(query, ctx)
+  }
+
+  const handleFollowUp = () => {
+    if (!followUp.trim()) return
+    void runQuery(followUp, context)
+    setFollowUp('')
+  }
+
+  const handleVoice = () => {
+    const SR =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SR) {
+      alert('Use Chrome for voice input')
       return
     }
-
-    const nextQuery = inputValue.trim()
-    setInputValue('')
-    setQueryText(nextQuery)
-    await submitQuery(nextQuery, context)
-  }
-
-  const handleMissingSubmit = async () => {
-    const nextContext: FarmContext = {
-      ...context,
-      land_size_acres: 2,
-      market_dependency: true,
+    const recognition = new SR()
+    recognition.lang = language === 'TA' ? 'ta-IN' : 'en-IN'
+    recognition.interimResults = false
+    recognition.onresult = (e: any) => {
+      const transcript = e.results[0][0].transcript
+      setFollowUp(transcript)
     }
-
-    missingFields.forEach((field) => {
-      nextContext[field] = answers[field].trim() || nextContext[field]
-    })
-
-    await submitQuery(queryText, nextContext)
+    recognition.start()
   }
 
-  try {
-    const diagnosisDescription = result?.insights?.[0]?.description ?? ''
-    const weatherDescription = result?.insights?.[1]?.description ?? ''
-    const treatmentDescription = result?.insights?.[2]?.description ?? ''
-    const marketDescription = result?.insights?.[3]?.description ?? ''
-    void diagnosisDescription
-    void weatherDescription
-    void treatmentDescription
-    void marketDescription
+  const toggleAudio = () => {
+    if (!audioRef.current) return
+    if (playing) {
+      audioRef.current.pause()
+      setPlaying(false)
+    } else {
+      void audioRef.current.play()
+      setPlaying(true)
+    }
+  }
 
-    if (!result && isLoading) return <div>Loading...</div>
-    if (result && !result.insights) return <div>Loading...</div>
+  return (
+    <div
+      style={{
+        maxWidth: '430px',
+        margin: '0 auto',
+        minHeight: '100vh',
+        background: '#f9fafb',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: "'Noto Sans Tamil', Arial, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '12px 16px',
+          background: 'white',
+          borderBottom: '1px solid #e5e7eb',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+        }}
+      >
+        <button
+          onClick={() => router.push('/')}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '20px',
+            cursor: 'pointer',
+            marginRight: '12px',
+          }}
+        >
+          ←
+        </button>
+        <span style={{ fontWeight: 700, fontSize: '16px', flex: 1 }}>
+          🌾 Farm Analysis
+        </span>
+        <button
+          onClick={() => setLanguage((l) => (l === 'EN' ? 'TA' : 'EN'))}
+          style={{
+            background: '#f3f4f6',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '4px 10px',
+            fontSize: '13px',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          {language}
+        </button>
+      </div>
 
-    return (
-      <div className="h-screen flex flex-col bg-gradient-to-b from-background via-primary/5 to-background relative">
-        <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border">
-          <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => router.push(`/?lang=${language}`)}
-                className="p-2 hover:bg-muted rounded-full transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-foreground" />
-              </button>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">{t?.title ?? 'Assistant'}</h1>
-                <p className="text-xs text-muted-foreground">{t?.subtitle ?? ''}</p>
-              </div>
-            </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        {query && (
+          <div
+            style={{
+              background: '#2ECC71',
+              color: 'white',
+              borderRadius: '18px 18px 4px 18px',
+              padding: '10px 14px',
+              marginBottom: '16px',
+              marginLeft: 'auto',
+              maxWidth: '80%',
+              fontSize: '14px',
+            }}
+          >
+            {query}
+          </div>
+        )}
+
+        {loading && (
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '4px 18px 18px 18px',
+              padding: '20px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <span style={{ fontSize: '24px' }}>🌾</span>
+            <span style={{ color: '#666', fontSize: '14px' }}>
+              Analyzing your farm... (takes ~30 seconds)
+            </span>
+          </div>
+        )}
+
+        {error && (
+          <div
+            style={{
+              background: '#FEE2E2',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              marginBottom: '16px',
+              color: '#DC2626',
+              fontSize: '14px',
+            }}
+          >
+            {error}
             <button
-              onClick={() => {
-                const nextLanguage: AppLanguage = language === 'EN' ? 'TA' : 'EN'
-                setLanguage(nextLanguage)
-                persistLanguage(nextLanguage)
+              onClick={() => void runQuery(query, context)}
+              style={{
+                display: 'block',
+                marginTop: '8px',
+                background: '#DC2626',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '6px 14px',
+                cursor: 'pointer',
+                fontSize: '13px',
               }}
-              className="rounded-full border border-border px-3 py-1 text-xs text-foreground"
             >
-              {language}
+              Retry
             </button>
           </div>
-        </div>
+        )}
 
-        <div className="flex-1 overflow-y-auto pb-40">
-          <div className="max-w-md mx-auto px-4 py-5 space-y-4">
-            {!queryText && !result && !isLoading && (
-              <div className="rounded-3xl border border-border bg-card p-5 text-sm text-muted-foreground">
-                {t?.noQuery ?? 'Loading...'}
-              </div>
-            )}
-
-            {isLoading && (
-              <div className="rounded-3xl border border-primary/20 bg-primary/5 p-4">
-                <div className="flex items-center gap-3">
-                  <Spinner className="size-5 text-primary" />
-                  <p className="font-semibold text-foreground">{t?.loading ?? 'Loading...'}</p>
-                </div>
-              </div>
-            )}
-
-            {result ? (
-              <div className="rounded-3xl border border-border bg-card p-4 shadow-sm space-y-4">
-                <p className="text-sm leading-6 text-foreground">{result?.summary ?? ''}</p>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {cards?.map((card) => (
-                    <div
-                      key={card?.type}
-                      className="rounded-2xl p-3 min-h-32 shadow-sm"
-                      style={{ backgroundColor: card?.color }}
-                    >
-                      <div className="flex items-center gap-2">
-                        {card?.icon ? <card.icon className="w-4 h-4 text-foreground" /> : null}
-                        <p className="text-sm font-semibold text-foreground">
-                          {card?.insight?.title ?? card?.type ?? ''}
-                        </p>
-                      </div>
-                      <p className="mt-3 text-xs leading-5 text-muted-foreground">
-                        {card?.insight?.description ?? ''}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {language === 'TA' && audioUrl ? (
-                  <div className="rounded-2xl border border-border bg-background/80 p-3">
-                    <p className="mb-2 text-xs font-semibold text-foreground">{t?.audio ?? ''}</p>
-                    <audio controls autoPlay src={audioUrl ?? undefined} className="w-full" />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {missingFields?.length > 0 && (
-              <div className="rounded-3xl border border-border bg-card p-4 space-y-4">
-                <h2 className="text-base font-semibold text-foreground">
-                  {t?.questionsTitle ?? 'Loading...'}
-                </h2>
-                {missingFields?.map((field) => (
-                  <div key={field} className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">{t?.[field] ?? field}</label>
-                    <p className="text-xs text-muted-foreground">{questions?.[field] ?? ''}</p>
-                    <input
-                      type="text"
-                      value={answers?.[field] ?? ''}
-                      onChange={(event) =>
-                        setAnswers((current) => ({
-                          ...current,
-                          [field]: event.target.value,
-                        }))
-                      }
-                      placeholder={t?.textPlaceholder ?? ''}
-                      className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-                    />
-                  </div>
-                ))}
-
-                <button
-                  onClick={() => void handleMissingSubmit()}
-                  disabled={isLoading}
-                  className="w-full rounded-2xl bg-primary text-primary-foreground px-4 py-3 font-semibold disabled:opacity-60"
+        {questions.length > 0 && !loading && (
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '4px 18px 18px 18px',
+              padding: '16px',
+              marginBottom: '16px',
+            }}
+          >
+            <p style={{ fontWeight: 600, marginBottom: '12px', fontSize: '14px' }}>
+              I need a few more details:
+            </p>
+            {questions.map((questionItem) => (
+              <div key={questionItem.field} style={{ marginBottom: '12px' }}>
+                <label
+                  style={{
+                    fontSize: '13px',
+                    color: '#666',
+                    display: 'block',
+                    marginBottom: '4px',
+                  }}
                 >
-                  {t?.submitAnswers ?? 'Continue'}
+                  {language === 'TA'
+                    ? questionItem.question_ta
+                    : questionItem.question}
+                </label>
+                <input
+                  value={answers[questionItem.field] || ''}
+                  onChange={(e) =>
+                    setAnswers((prev) => ({
+                      ...prev,
+                      [questionItem.field]: e.target.value,
+                    }))
+                  }
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                  placeholder="Type your answer..."
+                />
+              </div>
+            ))}
+            <button
+              onClick={handleMissingInfoSubmit}
+              style={{
+                background: '#2ECC71',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '10px 20px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                width: '100%',
+              }}
+            >
+              Analyze →
+            </button>
+          </div>
+        )}
+
+        {result && !loading && (
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '4px 18px 18px 18px',
+              padding: '16px',
+              marginBottom: '16px',
+            }}
+          >
+            <div style={{ marginBottom: '10px' }}>
+              <span
+                style={{
+                  background:
+                    result.confidence_level === 'high'
+                      ? '#DCFCE7'
+                      : result.confidence_level === 'medium'
+                        ? '#FEF9C3'
+                        : '#FEE2E2',
+                  color:
+                    result.confidence_level === 'high'
+                      ? '#16A34A'
+                      : result.confidence_level === 'medium'
+                        ? '#CA8A04'
+                        : '#DC2626',
+                  borderRadius: '20px',
+                  padding: '3px 10px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                }}
+              >
+                {result.confidence_level === 'high'
+                  ? '🟢 High Confidence'
+                  : result.confidence_level === 'medium'
+                    ? '🟡 Medium Confidence'
+                    : '🔴 Low Confidence'}
+              </span>
+            </div>
+
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#333',
+                lineHeight: 1.6,
+                marginBottom: '14px',
+              }}
+            >
+              {result.summary}
+            </p>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '8px',
+                marginBottom: '14px',
+              }}
+            >
+              {(result.insights || []).map((insight, index) => (
+                <div
+                  key={index}
+                  style={{
+                    background: CARD_COLORS[insight.type] || '#F5F5F5',
+                    borderRadius: '12px',
+                    padding: '10px',
+                    borderLeft: `3px solid ${CARD_BORDERS[insight.type] || '#999'}`,
+                  }}
+                >
+                  <div style={{ fontSize: '18px', marginBottom: '4px' }}>
+                    {CARD_ICONS[insight.type] || '📋'}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#333',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {insight.title}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#555', lineHeight: 1.4 }}>
+                    {insight.description}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {result.language === 'TA' && (
+              <div>
+                {audioUrl && (
+                  <audio
+                    ref={audioRef}
+                    src={audioUrl}
+                    onEnded={() => setPlaying(false)}
+                  />
+                )}
+                <button
+                  onClick={toggleAudio}
+                  style={{
+                    background: '#E8F5E9',
+                    border: 'none',
+                    borderRadius: '20px',
+                    padding: '8px 16px',
+                    fontSize: '13px',
+                    color: '#2ECC71',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    width: '100%',
+                  }}
+                >
+                  {playing ? '⏸ Pause' : '🔊 Listen in Tamil'}
                 </button>
               </div>
             )}
 
-            {error ? (
-              <div className="rounded-3xl border border-red-200 bg-red-50 p-4 text-red-700">
-                <p className="text-sm">{error?.message ?? 'Loading...'}</p>
-                {error?.retryable ? (
+            <div
+              style={{
+                marginTop: '12px',
+                display: 'flex',
+                gap: '6px',
+                flexWrap: 'wrap',
+              }}
+            >
+              {['What are the risks?', 'Best time to sell?', 'Alternative crops?'].map(
+                (quickQuestion) => (
                   <button
-                    onClick={() => void submitQuery(queryText, context)}
-                    className="mt-3 inline-flex rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+                    key={quickQuestion}
+                    onClick={() => void runQuery(quickQuestion, context)}
+                    style={{
+                      background: '#F0FDF4',
+                      border: '1px solid #86EFAC',
+                      borderRadius: '20px',
+                      padding: '5px 10px',
+                      fontSize: '11px',
+                      color: '#16A34A',
+                      cursor: 'pointer',
+                    }}
                   >
-                    {t?.retry ?? 'Retry'}
+                    {quickQuestion}
                   </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="fixed bottom-20 left-0 right-0 border-t border-border bg-background/80 backdrop-blur-md">
-          <div className="max-w-md mx-auto px-4 py-3">
-            <div className="flex items-center gap-2 rounded-full bg-card/90 border border-border shadow-sm p-1">
-              <input
-                type="text"
-                placeholder={t?.inputPlaceholder ?? 'Loading...'}
-                value={inputValue ?? ''}
-                onChange={(event) => setInputValue(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    void handleFollowUp()
-                  }
-                }}
-                className="flex-1 bg-transparent rounded-full p-3 focus:outline-none text-foreground placeholder:text-muted-foreground"
-                disabled={isLoading}
-              />
-              <button
-                onClick={() => void handleFollowUp()}
-                disabled={!inputValue?.trim() || isLoading}
-                className="bg-primary text-primary-foreground w-11 h-11 rounded-full hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center"
-              >
-                {isLoading ? <Spinner className="size-5" /> : <Send className="w-5 h-5" />}
-              </button>
+                )
+              )}
             </div>
           </div>
-        </div>
-
-        <BottomNavigation />
+        )}
       </div>
-    )
-  } catch {
-    return <div>Loading...</div>
-  }
+
+      <div
+        style={{
+          background: 'white',
+          borderTop: '1px solid #e5e7eb',
+          padding: '12px 16px',
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+        }}
+      >
+        <input
+          value={followUp}
+          onChange={(e) => setFollowUp(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleFollowUp()}
+          placeholder="Ask a follow-up question..."
+          style={{
+            flex: 1,
+            padding: '10px 14px',
+            border: '1px solid #e5e7eb',
+            borderRadius: '20px',
+            fontSize: '14px',
+            outline: 'none',
+            fontFamily: "'Noto Sans Tamil', Arial, sans-serif",
+          }}
+        />
+        <button
+          onClick={handleVoice}
+          style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '50%',
+            background: '#f3f4f6',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '16px',
+          }}
+        >
+          🎤
+        </button>
+        <button
+          onClick={handleFollowUp}
+          disabled={!followUp.trim()}
+          style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '50%',
+            background: followUp.trim() ? '#2ECC71' : '#e5e7eb',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '16px',
+            color: 'white',
+          }}
+        >
+          ➤
+        </button>
+      </div>
+    </div>
+  )
 }
 
-export default function AssistantPageWrapper() {
+export default function AssistantPage() {
   return (
     <Suspense
       fallback={
         <div
           style={{
             display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
             height: '100vh',
-            fontSize: '18px',
+            background: '#f9fafb',
           }}
         >
-          🌾 Loading...
+          <div style={{ fontSize: '48px' }}>🌾</div>
+          <div style={{ marginTop: '16px', fontSize: '16px', color: '#666' }}>
+            Loading...
+          </div>
         </div>
       }
     >
-      <AssistantPage />
+      <AssistantContent />
     </Suspense>
   )
 }

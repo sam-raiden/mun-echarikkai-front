@@ -228,7 +228,25 @@ function MarketPageContent() {
 
 export default function MarketPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+    <Suspense
+      fallback={
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '100vh',
+            background: '#f9fafb',
+          }}
+        >
+          <div style={{ fontSize: '48px' }}>🌾</div>
+          <div style={{ marginTop: '16px', fontSize: '16px', color: '#666' }}>
+            Loading...
+          </div>
+        </div>
+      }
+    >
       <MarketPageContent />
     </Suspense>
   )

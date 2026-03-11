@@ -170,29 +170,25 @@ function HomePageContent() {
   }
 
   const handleVoice = () => {
-    if (typeof window === 'undefined') {
-      return
-    }
-
     const SR =
-      (window as SpeechWindow).SpeechRecognition ||
-      (window as SpeechWindow).webkitSpeechRecognition
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SR) {
-      alert('Please use Chrome for voice input')
+      alert('Please use Chrome browser for voice input')
       return
     }
 
     const recognition = new SR()
     recognition.lang = language === 'TA' ? 'ta-IN' : 'en-IN'
     recognition.interimResults = false
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript
-      setQuery(transcript)
-      void handleSubmit(transcript)
-    }
-    recognition.onerror = () => setIsListening(false)
-    recognition.onend = () => setIsListening(false)
+    recognition.continuous = false
     recognition.onstart = () => setIsListening(true)
+    recognition.onend = () => setIsListening(false)
+    recognition.onerror = () => setIsListening(false)
+    recognition.onresult = (e: any) => {
+      const transcript = e.results[0][0].transcript
+      setQuery(transcript)
+      setTimeout(() => handleSubmit(transcript), 300)
+    }
     recognition.start()
   }
 
@@ -293,14 +289,14 @@ function HomePageContent() {
         transition={{ delay: 0.08 }}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[90%]"
       >
-        <div className="bg-white/95 text-black rounded-[28px] shadow-xl p-4 space-y-4">
+        <div className="bg-white/95 text-black rounded-[20px] shadow-xl px-[14px] py-[10px] space-y-4">
           <div className="flex items-center gap-2">
             <input
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t.placeholder}
-              className="flex-1 bg-transparent outline-none text-black placeholder:text-gray-500"
+              className="flex-1 bg-transparent px-[14px] py-[10px] outline-none text-[14px] text-black placeholder:text-gray-500"
             />
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -328,7 +324,7 @@ function HomePageContent() {
             className="hidden"
           />
 
-          <div className="rounded-3xl bg-lime-50 border border-lime-100 p-4">
+            <div className="rounded-3xl bg-lime-50 border border-lime-100 p-4">
             <div className="flex items-center justify-center">
               <VoiceButton
                   onPress={handleVoice}
@@ -339,7 +335,7 @@ function HomePageContent() {
             <p className="mt-4 text-center text-sm font-medium text-gray-700">
               {isListening ? t.listening : t.ready}
             </p>
-            <p className="mt-1 text-center text-xs text-gray-500">
+            <p className="mt-1 mb-1 text-center text-[11px] text-gray-500">
               {isListening ? t.stopVoice : t.startVoice}
             </p>
           </div>

@@ -218,20 +218,23 @@ function AssistantPageContent() {
   };
 
   const toggleAudio = () => {
-    if (!audioRef.current || !audioUrl) return;
+    if (!audioUrl) return
+    if (!audioRef.current) return
+    
     if (playing) {
-      audioRef.current.pause();
-      setPlaying(false);
+      audioRef.current.pause()
+      setPlaying(false)
     } else {
-      audioRef.current.src = audioUrl;
-      audioRef.current.load();
-      audioRef.current
-        .play()
-        .then(() => setPlaying(true))
-        .catch((e) => {
-          console.log('Play error:', e);
-          setPlaying(false);
-        });
+      const audio = audioRef.current
+      audio.src = audioUrl
+      audio.currentTime = 0
+      audio.load()
+      const playPromise = audio.play()
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setPlaying(true))
+          .catch(() => setPlaying(false))
+      }
     }
   };
 
@@ -857,7 +860,7 @@ function AssistantPageContent() {
       <audio
         ref={audioRef}
         src={audioUrl || ''}
-        onEnded={() => setPlaying(false)}
+        onEnded={() => { setPlaying(false) }}
         style={{ display: 'none' }}
       />
 

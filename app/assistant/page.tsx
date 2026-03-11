@@ -40,10 +40,10 @@ const CARD_BORDERS: Record<string, string> = {
 }
 
 const CARD_ICONS: Record<string, string> = {
-  diagnosis: '🌱',
-  weather: '🌦️',
-  treatment: '💊',
-  market: '📈',
+  diagnosis: '\u{1F331}',
+  weather: '\u{1F326}\uFE0F',
+  treatment: '\u{1F48A}',
+  market: '\u{1F4C8}',
 }
 
 function AssistantContent() {
@@ -202,19 +202,21 @@ function AssistantContent() {
         maxWidth: '430px',
         margin: '0 auto',
         minHeight: '100vh',
-        background: '#f9fafb',
+        background: 'linear-gradient(180deg, #0D1B0F 0%, #1A2F1A 40%, #0D2010 100%)',
         display: 'flex',
         flexDirection: 'column',
         fontFamily: "'Noto Sans Tamil', Arial, sans-serif",
+        position: 'relative',
       }}
     >
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          padding: '12px 16px',
-          background: 'white',
-          borderBottom: '1px solid #e5e7eb',
+          padding: '14px 16px',
+          background: 'rgba(0,0,0,0.3)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
           position: 'sticky',
           top: 0,
           zIndex: 10,
@@ -223,46 +225,57 @@ function AssistantContent() {
         <button
           onClick={() => router.push('/')}
           style={{
-            background: 'none',
-            border: 'none',
-            fontSize: '20px',
+            background: 'rgba(255,255,255,0.15)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: '50%',
+            width: '36px',
+            height: '36px',
+            color: 'white',
+            fontSize: '18px',
             cursor: 'pointer',
             marginRight: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          ←
+          {'\u2190'}
         </button>
-        <span style={{ fontWeight: 700, fontSize: '16px', flex: 1 }}>
-          🌾 Farm Analysis
+        <span style={{ fontWeight: 700, fontSize: '16px', flex: 1, color: 'white' }}>
+          {'\u{1F33E}'} Farm Analysis
         </span>
         <button
           onClick={() => setLanguage((current) => (current === 'EN' ? 'TA' : 'EN'))}
           style={{
-            background: '#f3f4f6',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '4px 10px',
+            background: 'rgba(46,204,113,0.2)',
+            border: '1px solid rgba(46,204,113,0.5)',
+            borderRadius: '20px',
+            padding: '5px 12px',
             fontSize: '13px',
             cursor: 'pointer',
-            fontWeight: 600,
+            fontWeight: 700,
+            color: '#2ECC71',
           }}
         >
           {language}
         </button>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', paddingBottom: '100px' }}>
         {query && (
           <div
             style={{
-              background: '#2ECC71',
+              background: 'linear-gradient(135deg, #2ECC71, #27AE60)',
               color: 'white',
               borderRadius: '18px 18px 4px 18px',
-              padding: '10px 14px',
+              padding: '12px 16px',
               marginBottom: '16px',
               marginLeft: 'auto',
               maxWidth: '80%',
               fontSize: '14px',
+              fontWeight: 500,
+              boxShadow: '0 4px 12px rgba(46,204,113,0.3)',
+              wordBreak: 'break-word',
             }}
           >
             {query}
@@ -272,17 +285,18 @@ function AssistantContent() {
         {loading && (
           <div
             style={{
-              background: 'white',
+              background: 'rgba(255,255,255,0.97)',
               borderRadius: '4px 18px 18px 18px',
               padding: '20px',
               marginBottom: '16px',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              gap: '12px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
             }}
           >
-            <span style={{ fontSize: '24px' }}>🌾</span>
-            <span style={{ color: '#666', fontSize: '14px' }}>
+            <span style={{ fontSize: '24px' }}>{'\u{1F33E}'}</span>
+            <span style={{ color: '#555', fontSize: '14px' }}>
               Analyzing your farm... (takes ~30 seconds)
             </span>
           </div>
@@ -291,12 +305,13 @@ function AssistantContent() {
         {error && (
           <div
             style={{
-              background: '#FEE2E2',
+              background: 'rgba(254,226,226,0.95)',
               borderRadius: '12px',
-              padding: '12px 16px',
+              padding: '14px 16px',
               marginBottom: '16px',
               color: '#DC2626',
               fontSize: '14px',
+              boxShadow: '0 4px 12px rgba(220,38,38,0.1)',
             }}
           >
             {error}
@@ -322,13 +337,21 @@ function AssistantContent() {
         {questions.length > 0 && !loading && (
           <div
             style={{
-              background: 'white',
+              background: 'rgba(255,255,255,0.97)',
               borderRadius: '4px 18px 18px 18px',
-              padding: '16px',
+              padding: '18px',
               marginBottom: '16px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
             }}
           >
-            <p style={{ fontWeight: 600, marginBottom: '12px', fontSize: '14px' }}>
+            <p
+              style={{
+                fontWeight: 700,
+                marginBottom: '14px',
+                fontSize: '15px',
+                color: '#1a1a1a',
+              }}
+            >
               I need a few more details:
             </p>
             {questions.map((questionItem) => (
@@ -355,11 +378,13 @@ function AssistantContent() {
                   }
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
+                    padding: '10px 14px',
+                    border: '1.5px solid #e5e7eb',
+                    borderRadius: '10px',
                     fontSize: '14px',
                     boxSizing: 'border-box',
+                    outline: 'none',
+                    marginTop: '4px',
                   }}
                   placeholder="Type your answer..."
                 />
@@ -368,18 +393,20 @@ function AssistantContent() {
             <button
               onClick={handleMissingInfoSubmit}
               style={{
-                background: '#2ECC71',
+                background: 'linear-gradient(135deg, #2ECC71, #27AE60)',
                 color: 'white',
                 border: 'none',
-                borderRadius: '10px',
-                padding: '10px 20px',
-                fontSize: '14px',
+                borderRadius: '12px',
+                padding: '12px 20px',
+                fontSize: '15px',
                 cursor: 'pointer',
-                fontWeight: 600,
+                fontWeight: 700,
                 width: '100%',
+                marginTop: '8px',
+                boxShadow: '0 4px 12px rgba(46,204,113,0.3)',
               }}
             >
-              Analyze →
+              Analyze {'\u2192'}
             </button>
           </div>
         )}
@@ -387,10 +414,12 @@ function AssistantContent() {
         {result && !loading && (
           <div
             style={{
-              background: 'white',
+              background: 'rgba(255,255,255,0.97)',
               borderRadius: '4px 18px 18px 18px',
               padding: '16px',
               marginBottom: '16px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              border: '1px solid rgba(255,255,255,0.2)',
             }}
           >
             <div style={{ marginBottom: '10px' }}>
@@ -409,25 +438,26 @@ function AssistantContent() {
                         ? '#CA8A04'
                         : '#DC2626',
                   borderRadius: '20px',
-                  padding: '3px 10px',
+                  padding: '4px 12px',
                   fontSize: '12px',
-                  fontWeight: 600,
+                  fontWeight: 700,
                 }}
               >
                 {result.confidence_level === 'high'
-                  ? '🟢 High Confidence'
+                  ? '\u{1F7E2} High Confidence'
                   : result.confidence_level === 'medium'
-                    ? '🟡 Medium Confidence'
-                    : '🔴 Low Confidence'}
+                    ? '\u{1F7E1} Medium Confidence'
+                    : '\u{1F534} Low Confidence'}
               </span>
             </div>
 
             <p
               style={{
                 fontSize: '14px',
-                color: '#333',
-                lineHeight: 1.6,
+                color: '#1a1a1a',
+                lineHeight: 1.7,
                 marginBottom: '14px',
+                marginTop: '10px',
               }}
             >
               {result.summary}
@@ -449,16 +479,17 @@ function AssistantContent() {
                     borderRadius: '12px',
                     padding: '10px',
                     borderLeft: `3px solid ${CARD_BORDERS[insight.type] || '#999'}`,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                   }}
                 >
-                  <div style={{ fontSize: '18px', marginBottom: '4px' }}>
-                    {CARD_ICONS[insight.type] || '📋'}
+                  <div style={{ fontSize: '20px', marginBottom: '6px' }}>
+                    {CARD_ICONS[insight.type] || '\u{1F4CB}'}
                   </div>
                   <div
                     style={{
                       fontSize: '12px',
                       fontWeight: 700,
-                      color: '#333',
+                      color: '#222',
                       marginBottom: '4px',
                     }}
                   >
@@ -474,30 +505,31 @@ function AssistantContent() {
             {result && (result.language === 'TA' || language === 'TA') && (
               <div
                 style={{
-                  background: '#E8F5E9',
-                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #E8F5E9, #C8E6C9)',
+                  borderRadius: '14px',
                   padding: '12px 16px',
                   marginTop: '12px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px',
-                  border: '1px solid #86EFAC',
+                  border: '2px solid #2ECC71',
+                  boxShadow: '0 2px 8px rgba(46,204,113,0.2)',
                 }}
               >
-                <span style={{ fontSize: '22px' }}>🔊</span>
+                <span style={{ fontSize: '24px' }}>{'\u{1F50A}'}</span>
                 <span
                   style={{
                     flex: 1,
                     fontSize: '13px',
                     color: '#16A34A',
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
                   {audioUrl
                     ? playing
-                      ? '▶ Playing Tamil audio...'
-                      : '🔊 Listen in Tamil'
-                    : '⏳ Generating Tamil audio...'}
+                      ? '\u25B6 Playing Tamil audio...'
+                      : '\u{1F50A} Listen in Tamil'
+                    : '\u23F3 Generating Tamil audio...'}
                 </span>
                 {audioUrl && (
                   <button
@@ -507,13 +539,17 @@ function AssistantContent() {
                       color: 'white',
                       border: 'none',
                       borderRadius: '50%',
-                      width: '36px',
-                      height: '36px',
+                      width: '40px',
+                      height: '40px',
                       cursor: 'pointer',
                       fontSize: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 8px rgba(46,204,113,0.4)',
                     }}
                   >
-                    {playing ? '⏸' : '▶'}
+                    {playing ? '\u23F8' : '\u25B6'}
                   </button>
                 )}
                 <audio
@@ -525,12 +561,7 @@ function AssistantContent() {
             )}
 
             <div
-              style={{
-                marginTop: '12px',
-                display: 'flex',
-                gap: '6px',
-                flexWrap: 'wrap',
-              }}
+              style={{ marginTop: '14px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}
             >
               {['What are the risks?', 'Best time to sell?', 'Alternative crops?'].map(
                 (quickQuestion) => (
@@ -538,13 +569,14 @@ function AssistantContent() {
                     key={quickQuestion}
                     onClick={() => void runQuery(quickQuestion, context)}
                     style={{
-                      background: '#F0FDF4',
-                      border: '1px solid #86EFAC',
+                      background: 'rgba(46,204,113,0.1)',
+                      border: '1px solid rgba(46,204,113,0.4)',
                       borderRadius: '20px',
-                      padding: '5px 10px',
+                      padding: '6px 12px',
                       fontSize: '11px',
                       color: '#16A34A',
                       cursor: 'pointer',
+                      fontWeight: 600,
                     }}
                   >
                     {quickQuestion}
@@ -558,12 +590,15 @@ function AssistantContent() {
 
       <div
         style={{
-          background: 'white',
-          borderTop: '1px solid #e5e7eb',
+          background: 'rgba(13,27,15,0.95)',
+          backdropFilter: 'blur(20px)',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
           padding: '12px 16px',
           display: 'flex',
           gap: '8px',
           alignItems: 'center',
+          position: 'sticky',
+          bottom: 0,
         }}
       >
         <input
@@ -573,43 +608,52 @@ function AssistantContent() {
           placeholder="Ask a follow-up question..."
           style={{
             flex: 1,
-            padding: '10px 14px',
-            border: '1px solid #e5e7eb',
-            borderRadius: '20px',
+            padding: '11px 16px',
+            border: 'none',
+            borderRadius: '24px',
             fontSize: '14px',
             outline: 'none',
+            background: 'rgba(255,255,255,0.95)',
             fontFamily: "'Noto Sans Tamil', Arial, sans-serif",
+            color: '#1a1a1a',
           }}
         />
         <button
           onClick={handleVoice}
           style={{
-            width: '38px',
-            height: '38px',
+            width: '42px',
+            height: '42px',
             borderRadius: '50%',
-            background: '#f3f4f6',
-            border: 'none',
+            background: 'rgba(255,255,255,0.15)',
+            border: '1px solid rgba(255,255,255,0.25)',
             cursor: 'pointer',
-            fontSize: '16px',
+            fontSize: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          🎤
+          {'\u{1F3A4}'}
         </button>
         <button
           onClick={handleFollowUp}
           disabled={!followUp.trim()}
           style={{
-            width: '38px',
-            height: '38px',
+            width: '42px',
+            height: '42px',
             borderRadius: '50%',
-            background: followUp.trim() ? '#2ECC71' : '#e5e7eb',
+            background: followUp.trim() ? '#2ECC71' : 'rgba(255,255,255,0.2)',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '16px',
+            fontSize: '18px',
             color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: followUp.trim() ? '0 4px 12px rgba(46,204,113,0.4)' : 'none',
           }}
         >
-          ➤
+          {'\u27A4'}
         </button>
       </div>
     </div>
@@ -627,11 +671,11 @@ export default function AssistantPage() {
             justifyContent: 'center',
             alignItems: 'center',
             height: '100vh',
-            background: '#f9fafb',
+            background: 'linear-gradient(180deg, #0D1B0F 0%, #1A2F1A 40%, #0D2010 100%)',
           }}
         >
-          <div style={{ fontSize: '48px' }}>🌾</div>
-          <div style={{ marginTop: '16px', fontSize: '16px', color: '#666' }}>
+          <div style={{ fontSize: '48px' }}>{'\u{1F33E}'}</div>
+          <div style={{ marginTop: '16px', fontSize: '16px', color: 'white' }}>
             Loading...
           </div>
         </div>

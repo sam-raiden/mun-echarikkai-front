@@ -710,11 +710,17 @@ function AssistantPageContent() {
                           gap: '10px',
                         }}
                       >
-                        <button
-                          onClick={toggleAudio}
-                          style={{
-                            width: '36px',
-                            height: '36px',
+                          <button
+                            onClick={() => {
+                              if (!audioUrl) return
+                              const a = new Audio(audioUrl)
+                              a.play()
+                              setPlaying(true)
+                              a.onended = () => setPlaying(false)
+                            }}
+                            style={{
+                              width: '36px',
+                              height: '36px',
                             borderRadius: '50%',
                             background: '#e8ebe9',
                             border: 'none',
